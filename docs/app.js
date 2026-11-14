@@ -466,6 +466,32 @@ function homeOrder() {
   return Object.fromEntries(keys.map((k, i) => [k, i]));
 }
 const hb = (key, html, ord) => (html ? `<div class="hb" data-hb="${key}" style="order:${ord[key]}">${html}</div>` : '');
+function openAdd() {
+  const items = [['new-pnote', 'note', 'Note'], ['new-todo', 'check-square', 'To-do'], ['new-event', 'calendar', 'Event'], ['new-note', 'shield', 'Vet note'], ['new-weight', 'scale', 'Weight'], ['new-photo', 'image', 'Photo']];
+  $('#modal').innerHTML = `<div class="sheet more" role="dialog" aria-modal="true" aria-label="Add"><div class="row between"><h2>Add</h2><button type="button" class="x" aria-label="Close" data-act="close">${ic('x')}</button></div><div class="mgrid">${items.map(([a, i, l]) => `<button data-act="${a}"><span class="mico" aria-hidden="true">${ic(i)}</span><span>${l}</span></button>`).join('')}</div></div>`;
+  $('#modal').hidden = false;
+}
+
+function toast(msg, undo) {
+  let t = $('#toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button type="button" data-act="toast-undo">Undo</button>' : ''}`;
+  t._undo = undo || null; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 5000);
+}
+
+// A swipe on the Quick log row must never count as a tap (also tapping to stop momentum scrolling).
+function bindTapGuard() {
+  let down = null, scrolling = false, st = 0;
+  const grid = (e) => e.target.closest && e.target.closest('.type-grid');
+  document.addEventListener('scroll', (e) => { if (e.target.classList && e.target.classList.contains('type-grid')) { scrolling = true; clearTimeout(st); st = setTimeout(() => { scrolling = false; }, 250); } }, true);
+  document.addEventListener('pointerdown', (e) => { down = grid(e) ? { x: e.clientX, y: e.clientY, bad: scrolling } : null; }, true);
+  document.addEventListener('pointermove', (e) => { if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) down.bad = true; }, true);
+  document.addEventListener('pointercancel', () => { if (down) down.bad = true; }, true);
+  document.addEventListener('click', (e) => { if (grid(e) && down && (down.bad || scrolling)) { e.preventDefault(); e.stopPropagation(); clearTimeout(ui.quickT); } }, true);
+}
+bindTapGuard();
+
 function phoneHero(p, d) {
   const photo = p.photo ? `<img class="hbg" src="${esc(p.photo)}" alt="">` : `<div class="hbg art">${dogArt('awake')}</div>`;
   const nm = esc(p.name || 'Your dog'), bits = [p.breed && esc(p.breed), p.dob && ageText(p.dob)].filter(Boolean).join(' · ');
@@ -479,7 +505,7 @@ function phoneHero(p, d) {
       <div class="hs"><span class="heye">Today with ${nm}</span><h2>${d.n} logged</h2><p>${d.dueDone} of ${d.dueTotal} care tasks done${meal ? ' · Last meal ' + ago(meal.ts) : ''}</p><div class="hchips">${pee ? `<span class="hchip">Last pee ${ago(pee.ts)}</span>` : ''}<span class="hchip">${statusLine() ? esc(statusLine()) : 'All calm'}</span></div></div>
       <div class="hs"><span class="heye">Coming up</span><h2>${nextEv ? esc(nextEv.title) : 'Nothing scheduled'}</h2><p>${nextEv ? fmtDate(nextEv.date) + (nextEv.time ? ' · ' + fmtTime(nextEv.time) : '') : 'Add a vet visit or walk on the Calendar'}</p><div class="hchips"><span class="hchip">${d.shots} shot${d.shots === 1 ? '' : 's'} due soon</span></div></div>
     </div>
-    <div class="hbtns"><button class="hplay" data-act="hero-log">${ic('plus')}<span>Quick log</span></button><button class="hcirc" data-act="new-note" aria-label="Add a note">${ic('note')}</button></div>
+    <div class="hbtns"><button class="hplay" data-act="hero-log">${ic('paw')}<span>Quick log</span></button><button class="hcirc" data-act="hero-add" aria-label="Add a note, to-do, event or more">${ic('plus')}</button></div>
     <div class="hdots" id="hdots"><i class="on"></i><i></i><i></i></div>
     </div>
   </div>`;
@@ -668,7 +694,7 @@ function calView() {
   const dayEvs = eventsOn(ui.selDay);
   return `
   <div class="card">
-    <div class="row between">
+    <div class="row between calhead">
       <div class="row"><button class="btn ghost sm" data-act="cal-month" data-v="-1" aria-label="Previous month">${ic('chev-left')}</button><h2 class="monthlabel">${m.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h2><button class="btn ghost sm" data-act="cal-month" data-v="1" aria-label="Next month">${ic('chev-right')}</button></div>
       <div class="row"><button class="btn ghost sm" data-act="cal-today">Today</button><button class="btn ghost sm" data-act="cal-sort">Sort: ${ui.calSort === 'time' ? 'Time' : 'Color'}</button><button class="btn primary sm" data-act="new-event">+ Add event</button></div>
     </div>
@@ -1048,7 +1074,8 @@ function openLogModal(typeId) {
 async function quick(id) {
   const info = typeInfo(id);
   if (info.detail || ui.logDay !== today()) return openLogModal(id);
-  await save('log', { type: id, ts: new Date().toISOString(), level: '', note: '' });
+  const rec = await save('log', { type: id, ts: new Date().toISOString(), level: '', note: '' });
+  toast('Logged ' + (info.name || id), () => remove('log', rec.id));
 }
 
 function openTrackerModal() {
@@ -1370,6 +1397,8 @@ const actions = {
   'toggle-bought': async (el, id) => { const s = get('supply', id); await save('supply', { ...s, bought: !s.bought }); },
   'del-supply': (el, id) => remove('supply', id),
   'edit-profile': () => openProfileModal(false),
+  'hero-add': openAdd,
+  'toast-undo': () => { const t = $('#toast'); if (t && t._undo) { t._undo(); t._undo = null; } if (t) t.classList.remove('show'); render(); },
   'hero-log': () => { const q = document.getElementById('quicklog'); if (q) q.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
   'reset-home': () => { try { localStorage.removeItem('pawlogHome'); } catch { /* ignore */ } render(); },
   'pet-menu': () => { ui.petMenu = !ui.petMenu; },
