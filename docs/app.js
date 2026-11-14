@@ -823,9 +823,59 @@ function setView() {
 
 const VIEWS = { notes: notesView, gallery: galView, todo: todoView, dashboard: dashView, calendar: calView, log: logView, care: careView, health: healthView, training: trainView, supplies: supView, settings: setView };
 
+/* ---------- liquid-glass tab bar (phone) ---------- */
+// The pill is built once so the glass "lens" can glide between tabs; later renders only move it.
+function renderDock() {
+  const bar = $('#tabbar');
+  if (!bar.querySelector('.pill')) {
+    const tabs = [...TABS.map((id) => { const [, icon, label] = PAGES.find((x) => x[0] === id); return `<button data-nav="${id}" aria-label="${label}">${ic(icon)}<span>${label.replace('Dashboard', 'Home')}</span></button>`; }), `<button data-act="more" aria-label="More">${ic('more')}<span>More</span></button>`];
+    bar.innerHTML = `<div class="pill"><i class="lens"></i>${tabs.join('')}</div>`;
+    bindDockDrag(bar.firstElementChild);
+  }
+  const pill = bar.firstElementChild, i = TABS.indexOf(ui.page);
+  pill.style.setProperty('--i', i < 0 ? TABS.length : i);
+  [...pill.querySelectorAll('button')].forEach((b, n) => b.classList.toggle('on', n === (i < 0 ? TABS.length : i)));
+}
+
+// Slide a finger across the bar: the lens follows the finger, the tab under it lights up, and lifting commits.
+function bindDockDrag(pill) {
+  const N = TABS.length + 1;
+  let x0 = null, drag = false, swallow = false;
+  const idxAt = (x) => { const r = pill.getBoundingClientRect(); return Math.max(0, Math.min(N - 1, Math.floor(((x - r.left) / r.width) * N))); };
+  const follow = (x) => {
+    const r = pill.getBoundingClientRect(), pad = 5, w = (r.width - pad * 2) / N;
+    const c = Math.max(pad, Math.min(r.width - pad - w, x - r.left - w / 2));
+    pill.style.setProperty('--lx', c - pad + 'px');
+    const hot = idxAt(x);
+    [...pill.querySelectorAll('button')].forEach((b, n) => b.classList.toggle('hot', n === hot));
+  };
+  pill.addEventListener('pointerdown', (e) => { x0 = e.clientX; drag = false; pill.classList.add('press'); });
+  pill.addEventListener('pointermove', (e) => {
+    if (x0 === null) return;
+    if (!drag && Math.abs(e.clientX - x0) > 8) { drag = true; pill.classList.add('drag'); try { pill.setPointerCapture(e.pointerId); } catch { /* ignore */ } }
+    if (drag) follow(e.clientX);
+  });
+  const end = (e, commit) => {
+    if (x0 === null) return;
+    const was = drag; x0 = null; drag = false;
+    pill.classList.remove('press', 'drag');
+    [...pill.querySelectorAll('button')].forEach((b) => b.classList.remove('hot'));
+    pill.style.removeProperty('--lx');
+    if (was && commit) {
+      swallow = true; setTimeout(() => { swallow = false; }, 0);
+      const n = idxAt(e.clientX);
+      if (navigator.vibrate) navigator.vibrate(6);
+      if (n < TABS.length) { ui.page = TABS[n]; closeModal(); render(); playEnter(); } else openMore();
+    }
+  };
+  pill.addEventListener('pointerup', (e) => end(e, true));
+  pill.addEventListener('pointercancel', (e) => end(e, false));
+  pill.addEventListener('click', (e) => { if (swallow) { e.stopPropagation(); e.preventDefault(); } }, true);
+}
+
 function render() {
   $('#nav').innerHTML = PAGES.filter(([id]) => id !== 'settings').map(([id, icon, label]) => `${NAV_SECTIONS[id] ? `<div class="navlbl">${NAV_SECTIONS[id]}</div>` : ''}<button data-nav="${id}" title="${label}" class="${id === ui.page ? 'on' : ''}" >${ic(icon)}<span class="lbl">${label}</span></button>`).join('');
-  $('#tabbar').innerHTML = [...TABS.map((id) => { const [, icon, label] = PAGES.find((x) => x[0] === id); return `<button data-nav="${id}" class="${id === ui.page ? 'on' : ''}" aria-label="${label}">${ic(icon)}<span>${label.replace('Dashboard', 'Home')}</span></button>`; }), `<button data-act="more" class="${TABS.includes(ui.page) ? '' : 'on'}" aria-label="More">${ic('more')}<span>More</span></button>`].join('');
+  renderDock();
   const pr = profile();
   const menu = ui.petMenu ? `<div class="menu" role="menu">${pets().map((x) => `<button class="mi" role="menuitem" data-act="pick-pet" data-id="${x.id}">${avatar(x, 'ava sm')}<span class="grow">${esc(x.name)}</span>${x.id === ui.petId ? ic('check') : ''}</button>`).join('')}<hr><button class="mi" role="menuitem" data-act="new-pet">${ic('plus')}<span class="grow">Add a pet…</span></button></div>` : '';
   $('#brand').innerHTML = `<div class="brandwrap"><button class="brandbtn" data-act="pet-menu" aria-haspopup="menu" aria-expanded="${ui.petMenu}"><img class="ava app" src="assets/icon.png" alt=""><span class="lbl bname"><b>Pawlog</b><small>${esc(pr.name || '')}</small></span><span class="lbl chev">${ic('chev-down')}</span></button>${menu}</div>`;
