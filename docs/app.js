@@ -468,7 +468,7 @@ function homeOrder() {
 const hb = (key, html, ord) => (html ? `<div class="hb" data-hb="${key}" style="order:${ord[key]}">${html}</div>` : '');
 function openAdd() {
   const items = [['new-pnote', 'note', 'Note'], ['new-todo', 'check-square', 'To-do'], ['new-event', 'calendar', 'Event'], ['new-note', 'shield', 'Vet note'], ['new-weight', 'scale', 'Weight'], ['new-photo', 'image', 'Photo']];
-  $('#modal').innerHTML = `<div class="sheet more" role="dialog" aria-modal="true" aria-label="Add"><div class="row between"><h2>Add</h2><button type="button" class="x" aria-label="Close" data-act="close">${ic('x')}</button></div><div class="mgrid">${items.map(([a, i, l]) => `<button data-act="${a}"><span class="mico" aria-hidden="true">${ic(i)}</span><span>${l}</span></button>`).join('')}</div></div>`;
+  $('#modal').innerHTML = `<div class="sheet more addsheet" role="dialog" aria-modal="true" aria-label="Add"><div class="row between"><h2>Add</h2><button type="button" class="x" aria-label="Close" data-act="close">${ic('x')}</button></div><div class="mgrid">${items.map(([a, i, l]) => `<button data-act="${a}"><span class="mico" aria-hidden="true">${ic(i)}</span><span>${l}</span></button>`).join('')}</div></div>`;
   $('#modal').hidden = false;
 }
 
@@ -491,6 +491,7 @@ function bindTapGuard() {
   document.addEventListener('click', (e) => { if (grid(e) && down && (down.bad || scrolling)) { e.preventDefault(); e.stopPropagation(); clearTimeout(ui.quickT); } }, true);
 }
 bindTapGuard();
+bindSheetDrag();
 
 function phoneHero(p, d) {
   const photo = p.photo ? `<img class="hbg" src="${esc(p.photo)}" alt="">` : `<div class="hbg art">${dogArt('awake')}</div>`;
@@ -945,7 +946,7 @@ function renderDock() {
     bar.innerHTML = `<div class="pill"><i class="lens"></i>${tabs.join('')}</div>`;
     bindDockDrag(bar.firstElementChild);
   }
-  const pill = bar.firstElementChild, i = TABS.indexOf(ui.page);
+  const pill = bar.firstElementChild, moreOpen = !$('#modal').hidden && !!document.querySelector('#modal .sheet.more:not(.closing):not(.addsheet)'), i = moreOpen ? -1 : TABS.indexOf(ui.page);
   pill.style.setProperty('--i', i < 0 ? TABS.length : i);
   [...pill.querySelectorAll('button')].forEach((b, n) => b.classList.toggle('on', n === (i < 0 ? TABS.length : i)));
 }
@@ -957,7 +958,7 @@ function bindDockDrag(pill) {
   const idxAt = (x) => { const r = pill.getBoundingClientRect(); return Math.max(0, Math.min(N - 1, Math.floor(((x - r.left) / r.width) * N))); };
   const follow = (x) => {
     const r = pill.getBoundingClientRect(), pad = 5, w = (r.width - pad * 2) / N;
-    const c = Math.max(pad, Math.min(r.width - pad - w, x - r.left - w / 2));
+    const e = w * 0.06, c = Math.max(pad + e, Math.min(r.width - pad - w - e, x - r.left - w / 2));
     pill.style.setProperty('--lx', c - pad + 'px');
     const hot = idxAt(x);
     [...pill.querySelectorAll('button')].forEach((b, n) => b.classList.toggle('hot', n === hot));
@@ -999,6 +1000,7 @@ function render() {
   const chip = $('#petchip');
   chip.innerHTML = pr.name ? `${avatar(pr, 'photo sm')}<div><b>${esc(pr.name)}</b><div class="muted small">${[esc(pr.breed || ''), pr.dob ? ageText(pr.dob) : ''].filter(Boolean).join(' · ')}</div><div class="status">${esc(statusLine())}</div></div>` : '';
   chip.hidden = !pr.name;
+  { const u = me(), nm = u.username || 'Account'; $('#acct').innerHTML = `${u.avatar ? `<img class="ava" src="${esc(u.avatar)}" alt="">` : `<span class="ava ph ini" aria-hidden="true">${esc(nm.trim().charAt(0).toUpperCase() || '?')}</span>`}<span class="an">${esc(nm)}</span>`; }
   $('#greet').textContent = `${greeting()}, ${new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}`;
   const m = me();
   $('#who').innerHTML = `${m.avatar ? `<img class="ava" src="${esc(m.avatar)}" alt="">` : `<span class="ava ph">${dogArt('awake')}</span>`}<span class="lbl wname"><b>${esc(m.username || 'Account')}</b><small id="syncst"></small></span>`;
@@ -1033,13 +1035,45 @@ function openMore() {
   const rest = PAGES.filter(([id]) => !TABS.includes(id) && id !== 'settings');
   $('#modal').innerHTML = `<div class="sheet more" role="dialog" aria-modal="true" aria-label="More">
     <div class="row between"><h2>More</h2><button type="button" class="x" aria-label="Close" data-act="close">${ic('x')}</button></div>
-    <button class="mprofile" data-nav="settings">${m.avatar ? `<img class="ava" src="${esc(m.avatar)}" alt="">` : `<span class="ava ph">${dogArt('awake')}</span>`}<span class="grow"><b>${esc(m.username || 'Account')}</b><small>Profile &amp; settings</small></span>${ic('chev-right')}</button>
+    <button class="mprofile" data-nav="settings">${m.avatar ? `<img class="ava" src="${esc(m.avatar)}" alt="">` : `<span class="ava ph ini" aria-hidden="true">${esc((m.username || 'A').trim().charAt(0).toUpperCase())}</span>`}<span class="grow"><b>${esc(m.username || 'Account')}</b><small>Profile &amp; settings</small></span>${ic('chev-right')}</button>
     <div class="mgrid">${rest.map(([id, icon, label]) => `<button data-nav="${id}" class="${id === ui.page ? 'on' : ''}"><span class="mico">${ic(icon)}</span><span>${label}</span></button>`).join('')}</div>
     <div class="mpets"><span class="mlbl">Pets</span>${pr.map((x) => `<button data-act="more-pet" data-id="${x.id}" class="${x.id === ui.petId ? 'on' : ''}">${avatar(x, 'ava sm')}<span>${esc(x.name)}</span></button>`).join('')}<button data-act="new-pet">${ic('plus')}<span>Add</span></button></div>
   </div>`;
   $('#modal').hidden = false;
+  renderDock();
 }
-function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; }
+function closeModal(now) {
+  const m = $('#modal'), sh = m.firstElementChild;
+  const anim = !now && !m.hidden && sh && matchMedia('(max-width:700px)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!anim) { m.hidden = true; m.innerHTML = ''; renderDock(); return; }
+  if (sh.classList.contains('closing')) return;
+  sh.classList.add('closing'); sh.style.transform = '';
+  setTimeout(() => { if (sh.isConnected && sh.classList.contains('closing')) { m.hidden = true; m.innerHTML = ''; renderDock(); } }, 280);
+}
+
+// Drag a sheet down by its top bar to dismiss it (phone).
+function bindSheetDrag() {
+  const ov = $('#modal'); let sh = null, y0 = 0, dy = 0, t0 = 0;
+  ov.addEventListener('touchstart', (e) => {
+    const s = e.target.closest('.sheet');
+    if (!s || e.touches.length !== 1 || s.classList.contains('closing') || e.touches[0].clientY - s.getBoundingClientRect().top > 64) return;
+    sh = s; y0 = e.touches[0].clientY; dy = 0; t0 = Date.now(); s.style.animation = 'none'; s.style.transition = 'none';
+  }, { passive: true });
+  ov.addEventListener('touchmove', (e) => {
+    if (!sh) return;
+    dy = Math.max(0, e.touches[0].clientY - y0);
+    if (dy > 4) e.preventDefault();
+    sh.style.transform = `translateY(${dy}px)`;
+  }, { passive: false });
+  const end = () => {
+    if (!sh) return;
+    const s = sh; sh = null;
+    s.style.transition = 'transform .3s cubic-bezier(.32,.72,0,1)';
+    if (dy > 110 || dy / Math.max(1, Date.now() - t0) > 0.6) { s.style.transform = 'translateY(105%)'; s.classList.add('closing'); s.style.animation = 'none'; setTimeout(() => closeModal(true), 300); }
+    else { s.style.transform = ''; setTimeout(() => { s.style.transition = ''; s.style.animation = ''; }, 320); }
+  };
+  ov.addEventListener('touchend', end); ov.addEventListener('touchcancel', end);
+}
 
 function openModal(title, body, onSubmit, saveLabel = 'Save', extra = '') {
   const m = $('#modal');
