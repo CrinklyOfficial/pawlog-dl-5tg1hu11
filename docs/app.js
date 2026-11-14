@@ -457,6 +457,87 @@ function openTodoModal(id) {
     }, 'Save', id ? `<button type="button" class="btn danger" data-act="del-todo" data-id="${id}">Delete</button>` : '');
 }
 
+/* ---------- Home: full-screen hero + reorderable blocks (phone) ---------- */
+const HOME_KEYS = ['quick', 'today', 'care', 'upcoming', 'recent', 'sofar', 'health', 'training', 'memories'];
+function homeOrder() {
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem('pawlogHome') || '[]'); } catch { /* storage unavailable: default order */ }
+  const keys = [...saved.filter((k) => HOME_KEYS.includes(k)), ...HOME_KEYS.filter((k) => !saved.includes(k))];
+  return Object.fromEntries(keys.map((k, i) => [k, i]));
+}
+const hb = (key, html, ord) => (html ? `<div class="hb" data-hb="${key}" style="order:${ord[key]}">${html}</div>` : '');
+function phoneHero(p, d) {
+  const photo = p.photo ? `<img class="hbg" src="${esc(p.photo)}" alt="">` : `<div class="hbg art">${dogArt('awake')}</div>`;
+  const nm = esc(p.name || 'Your dog'), bits = [p.breed && esc(p.breed), p.dob && ageText(p.dob)].filter(Boolean).join(' · ');
+  const meal = lastOf('meal'), pee = lastOf('pee');
+  const nextEv = d.upcoming[0];
+  const chips = [d.w && `${d.w.lb} lb`, d.appt && `Vet ${fmtDate(d.appt.date)}`, p.dob && `Born ${fmtDate(p.dob)}`].filter(Boolean).map((c) => `<span class="hchip">${c}</span>`).join('');
+  return `<div class="phhero">${photo}<div class="hshade"></div>
+    <div class="hcol">
+    <div class="hslides" id="hslides">
+      <div class="hs"><span class="heye">${greeting()}</span><h2>${nm}</h2><p>${bits || 'Add a breed and birthday in the profile'}</p><div class="hchips">${chips}</div></div>
+      <div class="hs"><span class="heye">Today with ${nm}</span><h2>${d.n} logged</h2><p>${d.dueDone} of ${d.dueTotal} care tasks done${meal ? ' · Last meal ' + ago(meal.ts) : ''}</p><div class="hchips">${pee ? `<span class="hchip">Last pee ${ago(pee.ts)}</span>` : ''}<span class="hchip">${statusLine() ? esc(statusLine()) : 'All calm'}</span></div></div>
+      <div class="hs"><span class="heye">Coming up</span><h2>${nextEv ? esc(nextEv.title) : 'Nothing scheduled'}</h2><p>${nextEv ? fmtDate(nextEv.date) + (nextEv.time ? ' · ' + fmtTime(nextEv.time) : '') : 'Add a vet visit or walk on the Calendar'}</p><div class="hchips"><span class="hchip">${d.shots} shot${d.shots === 1 ? '' : 's'} due soon</span></div></div>
+    </div>
+    <div class="hbtns"><button class="hplay" data-act="hero-log">${ic('plus')}<span>Quick log</span></button><button class="hcirc" data-act="new-note" aria-label="Add a note">${ic('note')}</button></div>
+    <div class="hdots" id="hdots"><i class="on"></i><i></i><i></i></div>
+    </div>
+  </div>`;
+}
+
+// Long-press a Home block, then drag it up or down. Order is stored on this device.
+function bindHomeReorder() {
+  let el = null, timer = null, sx = 0, sy = 0, grab = 0, lastY = 0, scrollT = null, dragging = false;
+  const view = () => document.querySelector('.hlist');
+  const blocks = () => [...view().querySelectorAll('.hb')].sort((a, b) => a.style.order - b.style.order);
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  const move = (y) => {
+    el.style.transform = 'none';
+    const r = el.getBoundingClientRect();
+    el.style.transform = `translateY(${y - grab - r.top}px) scale(1.03)`;
+    const mid = y - grab + r.height / 2, list = blocks(), i = list.indexOf(el);
+    const swap = (j) => { const a = el.style.order; el.style.order = list[j].style.order; list[j].style.order = a; };
+    if (i > 0) { const q = list[i - 1].getBoundingClientRect(); if (mid < q.top + q.height / 2) { swap(i - 1); return move(y); } }
+    if (i < list.length - 1) { const q = list[i + 1].getBoundingClientRect(); if (mid > q.top + q.height / 2) { swap(i + 1); return move(y); } }
+  };
+  const end = () => {
+    cancel();
+    if (!dragging) return;
+    dragging = false; clearInterval(scrollT);
+    el.classList.remove('lift'); el.style.transform = ''; document.body.classList.remove('reorder');
+    try { localStorage.setItem('pawlogHome', JSON.stringify(blocks().map((b) => b.dataset.hb))); } catch { /* storage unavailable: order just won't persist */ }
+    const blk = el; el = null; blk.dataset.drop = '1'; setTimeout(() => delete blk.dataset.drop, 350);
+  };
+  document.addEventListener('pointerdown', (e) => {
+    const b = e.target.closest && e.target.closest('.hb');
+    if (!b || !view() || e.button > 0 || e.target.closest('input,textarea,select')) return;
+    el = b; sx = e.clientX; sy = e.clientY; lastY = sy;
+    cancel();
+    timer = setTimeout(() => {
+      dragging = true; b.classList.add('lift'); document.body.classList.add('reorder');
+      grab = sy - b.getBoundingClientRect().top; move(lastY);
+      if (navigator.vibrate) navigator.vibrate(12);
+      scrollT = setInterval(() => { const m = document.querySelector('main'), h = innerHeight; if (lastY < 120) m.scrollTop -= 10; else if (lastY > h - 130) m.scrollTop += 10; if (el) move(lastY); }, 16);
+    }, 480);
+  });
+  document.addEventListener('pointermove', (e) => {
+    lastY = e.clientY;
+    if (dragging) move(e.clientY);
+    else if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 9) cancel();
+  });
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+  document.addEventListener('touchmove', (e) => { if (dragging) e.preventDefault(); }, { passive: false });
+  document.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('.hb')) e.preventDefault(); });
+  document.addEventListener('click', (e) => { if (document.querySelector('.hb[data-drop]')) { e.stopPropagation(); e.preventDefault(); } }, true);
+  // hero page dots follow the swipe
+  document.addEventListener('scroll', (e) => {
+    const t = e.target;
+    if (t && t.id === 'hslides') { const n = Math.round(t.scrollLeft / t.clientWidth); document.querySelectorAll('#hdots i').forEach((d, k) => d.classList.toggle('on', k === n)); }
+    if (t && t.tagName === 'MAIN') t.classList.toggle('scrolled', t.scrollTop > 40);
+  }, true);
+}
+
 function dashView() {
   const p = profile(), t = today();
   const dueTasks = careTasks().filter((k) => doneToday(k) || nextDue(k) <= t);
@@ -501,8 +582,12 @@ function dashView() {
     <div class="grow"><div class="row between"><h2>Today</h2><button class="link" data-nav="todo">All to-dos</button></div>
       ${next.length ? next.join('') : `<p class="muted" style="margin-top:6px">${total ? 'Everything is done. Nice work!' : 'Nothing is due today. Enjoy the day with ' + esc(p.name || 'your dog') + '.'}</p>`}</div></div>`;
 
+  const ord = homeOrder();
+  const heroData = { w, appt, upcoming, n: todayLog.length, dueDone: doneN, dueTotal: dueTasks.length, shots: shotsSoon.length };
   return `
-  ${todayCard}
+  ${phoneHero(p, heroData)}
+  <div class="hlist">
+  ${hb('today', todayCard, ord)}
   <div class="card hero">
     <div class="hero-main">
       ${avatar(p, 'photo', 'data-act="edit-profile" title="Change photo"')}
@@ -517,40 +602,40 @@ function dashView() {
     <div class="hero-art" id="heroart">${heroArt()}</div>
   </div>
 
-  <div class="card">
+  ${hb('quick', `<div class="card quick" id="quicklog">
     <div class="row between"><h2>Quick log</h2><span class="muted small">${todayLog.length} logged today</span></div>
     <div class="type-grid">${allTypes().map(typeBtn).join('')}</div>
-  </div>
+  </div>`, ord)}
 
   <div class="cards three">
-    <div class="card">
+    ${hb('care', `<div class="card">
       <div class="row between"><h2>Today's care</h2><span class="muted small">${doneN} of ${dueTasks.length}</span></div>
       <div class="prog"><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><span class="muted small">${pct}%</span></div>
       ${dueTasks.length ? dueTasks.map((k) => `<label class="care-item${doneToday(k) ? ' done' : ''}"><input type="checkbox" data-act="toggle-task" data-id="${k.id}" ${doneToday(k) ? 'checked' : ''}><span class="care-name">${esc(k.name)}</span><span class="muted small">${k.everyDays === 1 ? 'Daily' : 'Every ' + k.everyDays + 'd'}</span></label>`).join('') : blank('clipboard', 'All caught up', 'No care tasks are due today.')}
       ${trainToday.length ? `<h3 class="sub">Training</h3>${trainToday.map((x) => `<div class="entry"><span class="time">${fmtTime(x.time)}</span><span class="grow">${esc(x.tr.name)}</span>${x.done ? '<span class="pill ok">Done</span>' : `<button class="btn sm" data-act="rate-session" data-id="${x.tr.id}">Rate</button>`}</div>`).join('')}` : ''}
-    </div>
+    </div>`, ord)}
 
-    <div class="card">
+    ${hb('recent', `<div class="card">
       <div class="row between"><h2>Recent activity</h2><button class="link" data-nav="log">View log</button></div>
       ${recent.length ? recent.slice(0, 10).map((l) => entryRow(l, true)).join('') : blank('bone', 'Nothing logged yet', `Tap a button above to log ${p.name}\'s day.`)}
-    </div>
+    </div>`, ord)}
 
-    <div class="card">
+    ${hb('upcoming', `<div class="card">
       <div class="row between"><h2>Upcoming</h2><button class="link" data-nav="calendar">Calendar</button></div>
       ${agenda.length ? agenda.map((a) => a.html).join('') : blank('calendar', 'Nothing scheduled', 'Add events on the Calendar.')}
-    </div>
+    </div>`, ord)}
   </div>
 
   <div class="cards three">
-    <div class="card">
+    ${hb('sofar', `<div class="card">
       <div class="row between"><h2>Today so far</h2><span class="muted small">${todayLog.length} entries</span></div>
       <div class="tiles">${counts.map((x) => `<div class="tile"><b>${x.n}</b><span>${esc(x.tp.name)}</span></div>`).join('')}</div>
       ${(() => { const wl = todayLog.filter((l) => l.type === 'water' && l.level); return wl.length ? `<div class="kv"><span>Water intake</span><span>${wl.map((l) => esc(l.level)).join(', ')}</span></div>` : ''; })()}
       <div class="kv"><span>Last meal</span><span>${lastOf('meal') ? ago(lastOf('meal').ts) : '—'}</span></div>
       <div class="kv"><span>Last nap</span><span>${lastOf('nap') ? ago(lastOf('nap').ts) : '—'}</span></div>
-    </div>
+    </div>`, ord)}
 
-    <div class="card">
+    ${hb('health', `<div class="card">
       <div class="row between"><h2>Health</h2><button class="link" data-nav="health">Details</button></div>
       <div class="kv"><span>Weight</span><span>${ws[0] ? ws[0].lb + ' lb' + (wDelta ? ` <span class="muted">(${wDelta > 0 ? '+' : ''}${wDelta})</span>` : '') : '—'}</span></div>
       ${bars.length > 1 ? `<div class="mini">${bars.map((b) => `<i title="${b.lb} lb" style="height:${20 + 80 * (b.lb - wMin) / ((wMax - wMin) || 1)}%"></i>`).join('')}</div>` : ''}
@@ -558,16 +643,17 @@ function dashView() {
       <div class="kv"><span>Last exam</span><span>${(() => { const ex = all('vetNote').filter((n) => n.kind === 'exam').sort((a, b) => b.date.localeCompare(a.date))[0]; return ex ? fmtDate(ex.date) : '—'; })()}</span></div>
       <div class="kv"><span>Vet</span><span>${esc(v.name) || '—'}</span></div>
       ${v.phone ? `<div class="kv"><span>Phone</span><span>${esc(v.phone)}</span></div>` : ''}
-    </div>
+    </div>`, ord)}
 
-    <div class="card">
+    ${hb('training', `<div class="card">
       <div class="row between"><h2>Training &amp; supplies</h2><button class="link" data-nav="training">Training</button></div>
       ${recentSess.length ? recentSess.map((x) => { const tr = get('training', x.trainingId); return `<div class="entry" tabindex="0" role="button" data-act="view-session" data-id="${x.id}"><span class="grow">${esc(tr ? tr.name : 'Removed training')}</span><span class="muted small">${fmtDate(dayOf(x.ts))}</span><span class="stars-view">${'★'.repeat(x.stars)}<span class="off">${'★'.repeat(5 - x.stars)}</span></span></div>`; }).join('') : blank('cap', 'No sessions yet', 'Rate a session after you train.')}
       <h3 class="sub">Supplies to get</h3>
       ${toGet.length ? `<div class="kv"><span>${toGet.length} item${toGet.length === 1 ? '' : 's'}</span><span>${getTotal ? '≈ $' + getTotal.toFixed(2) : ''}</span></div>${toGet.slice(0, 5).map((s) => `<div class="kv"><span>${esc(s.name)}</span><span class="muted">${s.price ? '$' + Number(s.price).toFixed(2) : ''}</span></div>`).join('')}` : '<p class="empty">Nothing on the list.</p>'}
-    </div>
+    </div>`, ord)}
   </div>
-  ${strip}`;
+  ${hb('memories', strip, ord)}
+  </div>`;
 }
 
 function calView() {
@@ -817,6 +903,7 @@ function setView() {
     <section>${head('Daily log trackers', 'new-tracker')}<div class="group">
       ${all('trackType').map((t) => `<div class="srow"><span class="value">${esc(t.name)}${t.freq || t.notes ? `<div class="sub-line">${esc([t.freq, t.notes].filter(Boolean).join(' · '))}</div>` : ''}</span><button class="x" aria-label="Remove" data-act="del-type" data-id="${t.id}">${ic('x')}</button></div>`).join('') || '<div class="srow muted">No custom trackers yet. Pee, poop, meal, water, nap, activity and medication are built in.</div>'}
     </div></section>
+    <section><div class="group"><div class="srow"><span class="value">Home layout<div class="sub-line">Press and hold a card on Home to move it.</div></span><button class="btn sm" data-act="reset-home">Reset</button></div></div></section>
     <p class="note">Your data is stored securely in the cloud and cached on this device so Pawlog works offline.</p>
   </div>`;
 }
@@ -873,12 +960,14 @@ function bindDockDrag(pill) {
   pill.addEventListener('click', (e) => { if (swallow) { e.stopPropagation(); e.preventDefault(); } }, true);
 }
 
+bindHomeReorder();
 function render() {
   $('#nav').innerHTML = PAGES.filter(([id]) => id !== 'settings').map(([id, icon, label]) => `${NAV_SECTIONS[id] ? `<div class="navlbl">${NAV_SECTIONS[id]}</div>` : ''}<button data-nav="${id}" title="${label}" class="${id === ui.page ? 'on' : ''}" >${ic(icon)}<span class="lbl">${label}</span></button>`).join('');
   renderDock();
   const pr = profile();
   const menu = ui.petMenu ? `<div class="menu" role="menu">${pets().map((x) => `<button class="mi" role="menuitem" data-act="pick-pet" data-id="${x.id}">${avatar(x, 'ava sm')}<span class="grow">${esc(x.name)}</span>${x.id === ui.petId ? ic('check') : ''}</button>`).join('')}<hr><button class="mi" role="menuitem" data-act="new-pet">${ic('plus')}<span class="grow">Add a pet…</span></button></div>` : '';
   $('#brand').innerHTML = `<div class="brandwrap"><button class="brandbtn" data-act="pet-menu" aria-haspopup="menu" aria-expanded="${ui.petMenu}"><img class="ava app" src="assets/icon.png" alt=""><span class="lbl bname"><b>Pawlog</b><small>${esc(pr.name || '')}</small></span><span class="lbl chev">${ic('chev-down')}</span></button>${menu}</div>`;
+  document.body.dataset.page = ui.page;
   const [, , label] = PAGES.find((x) => x[0] === ui.page);
   $('#title').textContent = ui.page === 'dashboard' ? 'Today' : label;
   const chip = $('#petchip');
@@ -1281,6 +1370,8 @@ const actions = {
   'toggle-bought': async (el, id) => { const s = get('supply', id); await save('supply', { ...s, bought: !s.bought }); },
   'del-supply': (el, id) => remove('supply', id),
   'edit-profile': () => openProfileModal(false),
+  'hero-log': () => { const q = document.getElementById('quicklog'); if (q) q.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
+  'reset-home': () => { try { localStorage.removeItem('pawlogHome'); } catch { /* ignore */ } render(); },
   'pet-menu': () => { ui.petMenu = !ui.petMenu; },
   'pick-pet': (el, id) => setPet(id),
   more: () => openMore(),
