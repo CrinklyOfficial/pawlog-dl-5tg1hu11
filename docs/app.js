@@ -942,14 +942,22 @@ const VIEWS = { notes: notesView, gallery: galView, todo: todoView, dashboard: d
 /* ---------- liquid-glass tab bar (phone) ---------- */
 // The bar is built once. The glass "lens" is moved by a spring (see spring()) so it always starts from where it is now,
 // keeps its speed when a new tap or flick interrupts it, and never bounces unless a flick carried momentum.
-const dock = { x: 0, v: 0, a: null, drag: false, rv: 0 };
-const dockSlot = (pill) => (pill.clientWidth - 12) / (TABS.length + 1);
-function dockSet(pill, x) { dock.x = x; pill.firstElementChild.style.transform = `translate3d(${x.toFixed(2)}px,0,0)`; }
-function dockTo(pill, to, v = 0, damping = 1) {
+const dock = { x: 0, v: 0, a: null, drag: false, rv: 0, n: -1, lt: 0 };
+const DOCK_PAD = 4; // gap between the bar's edge and the lens, in px
+const dockSlot = (pill) => (pill.clientWidth - DOCK_PAD * 2) / (TABS.length + 1);
+// "lifted" = the lens is held or has just moved: it swells into clear glass, then relaxes ~0.35s after (see CSS .lift)
+function dockLift(pill, on, ms = 0) {
+  clearTimeout(dock.lt);
+  if (on) pill.classList.add('lift');
+  if (!on || ms) dock.lt = setTimeout(() => pill.classList.remove('lift'), on ? ms : 0);
+}
+// lens is positioned with `translate`, which CSS applies before `scale`: the lens isn't shoved sideways when it swells
+function dockSet(pill, x) { dock.x = x; pill.firstElementChild.style.translate = `${x.toFixed(2)}px 0`; }
+function dockTo(pill, to, v = 0, damping = 0.74) {
   if (dock.a) dock.a.stop();
   dock.a = null;
   if (calm() || Math.abs(to - dock.x) < 0.3) { dock.v = 0; dockSet(pill, to); return; }
-  dock.a = spring({ from: dock.x, to, v, response: 0.4, damping, onUpdate: (x, vel) => { dock.v = vel; dockSet(pill, x); }, onDone: () => { dock.a = null; dock.v = 0; } });
+  dock.a = spring({ from: dock.x, to, v, response: 0.32, damping, onUpdate: (x, vel) => { dock.v = vel; dockSet(pill, x); }, onDone: () => { dock.a = null; dock.v = 0; } });
 }
 function renderDock() {
   const bar = $('#tabbar');
@@ -967,7 +975,9 @@ function renderDock() {
   });
   if (!pill.clientWidth || dock.drag) return;
   const to = n * dockSlot(pill), v = dock.rv; dock.rv = 0;
-  if (fresh) dockSet(pill, to); else dockTo(pill, to, v, v ? 0.86 : 1);
+  if (fresh) dockSet(pill, to);
+  else { if (n !== dock.n) dockLift(pill, true, 320); dockTo(pill, to, v, v ? 0.7 : 0.74); }
+  dock.n = n;
 }
 
 // Slide a finger across the bar: the lens tracks the finger, the tab under it lights up, and lifting throws it
@@ -976,7 +986,7 @@ function bindDockDrag(pill) {
   const N = TABS.length + 1, btns = () => [...pill.querySelectorAll('button')];
   let x0 = null, swallow = false, hist = [], tx = 0, raf = 0;
   const idxAt = (x) => { const r = pill.getBoundingClientRect(); return Math.max(0, Math.min(N - 1, Math.floor(((x - r.left) / r.width) * N))); };
-  const target = (x) => { const r = pill.getBoundingClientRect(), w = dockSlot(pill); return Math.max(0, Math.min((N - 1) * w, x - r.left - 6 - w / 2)); };
+  const target = (x) => { const r = pill.getBoundingClientRect(), w = dockSlot(pill); return Math.max(0, Math.min((N - 1) * w, x - r.left - DOCK_PAD - w / 2)); };
   const hot = (x) => { const h = idxAt(x); btns().forEach((b, n) => b.classList.toggle('hot', n === h)); };
   // the lens eases toward the finger (about 45ms lag) so grabbing it from another tab never jumps
   let t0 = 0;
@@ -987,12 +997,12 @@ function bindDockDrag(pill) {
     dock.v = dt ? (nx - dock.x) / dt : 0; dockSet(pill, nx);
     raf = requestAnimationFrame(loop);
   };
-  pill.addEventListener('pointerdown', (e) => { x0 = e.clientX; hist = [{ t: e.timeStamp, x: e.clientX }]; pill.classList.add('press'); });
+  pill.addEventListener('pointerdown', (e) => { x0 = e.clientX; hist = [{ t: e.timeStamp, x: e.clientX }]; pill.classList.add('press'); if (idxAt(e.clientX) === dock.n) dockLift(pill, true); });
   pill.addEventListener('pointermove', (e) => {
     if (x0 === null) return;
     hist.push({ t: e.timeStamp, x: e.clientX }); while (hist.length > 2 && e.timeStamp - hist[0].t > 100) hist.shift();
     if (!dock.drag && Math.abs(e.clientX - x0) > 8) {
-      dock.drag = true; pill.classList.add('drag'); if (dock.a) { dock.a.stop(); dock.a = null; }
+      dock.drag = true; pill.classList.add('drag'); dockLift(pill, true); if (dock.a) { dock.a.stop(); dock.a = null; }
       try { pill.setPointerCapture(e.pointerId); } catch { /* ignore */ }
       t0 = 0; raf = requestAnimationFrame(loop);
     }
@@ -1002,7 +1012,8 @@ function bindDockDrag(pill) {
     if (x0 === null) return;
     const was = dock.drag; x0 = null; dock.drag = false; cancelAnimationFrame(raf);
     pill.classList.remove('press', 'drag'); btns().forEach((b) => b.classList.remove('hot'));
-    if (!was) return;
+    if (!was) { if (pill.classList.contains('lift')) dockLift(pill, false); return; }
+    dockLift(pill, true, 140);
     swallow = true; setTimeout(() => { swallow = false; }, 0);
     if (!commit) { renderDock(); return; }
     const a = hist[0], b = hist[hist.length - 1], v = b.t > a.t ? ((b.x - a.x) / (b.t - a.t)) * 1000 : 0;
