@@ -941,3 +941,13 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 }
 
 @property --lift { syntax: '<number>'; inherits: true; initial-value: 0; }
+
+/* ---- smoothness (ProMotion 120Hz): keep every moving thing on the compositor and drop blur that can't be seen ---- */
+@media (max-width: 700px) {
+  /* sheets are 97% opaque, so their 40px backdrop blur was invisible but re-rendered every frame of every drag */
+  .sheet { -webkit-backdrop-filter: none; backdrop-filter: none; will-change: transform; }
+  .overlay { will-change: background-color; }
+  nav.tabbar .pill { contain: layout style; }
+  nav.tabbar .pill button { will-change: scale; }
+  main { -webkit-overflow-scrolling: touch; }
+}

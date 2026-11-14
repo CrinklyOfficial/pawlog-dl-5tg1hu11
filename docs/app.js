@@ -948,13 +948,14 @@ const dockSlot = (pill) => (pill.clientWidth - DOCK_PAD * 2) / (TABS.length + 1)
 // "lifted" = the lens is held or has just moved: it swells into clear glass, then relaxes ~0.35s after (see CSS .lift)
 function dockLift(pill, on, ms = 0) {
   clearTimeout(dock.lt);
-  if (on) pill.classList.add('lift');
+  if (on) { pill.classList.add('lift'); dockSet(pill, dock.x); }
   if (!on || ms) dock.lt = setTimeout(() => pill.classList.remove('lift'), on ? ms : 0);
 }
 // lens is positioned with `translate`, which CSS applies before `scale`: the lens isn't shoved sideways when it swells
 function dockSet(pill, x) {
   dock.x = x; pill.firstElementChild.style.translate = `${x.toFixed(2)}px 0`;
   // our own magnifier: each tab swells according to how near the lens centre is (CSS scales it by --lift while held)
+  if (!pill.classList.contains('lift')) return; // magnification only matters while held: skip the per-frame style writes otherwise
   const w = dockSlot(pill);
   [...pill.querySelectorAll('button')].forEach((b, k) => {
     const d = Math.abs((k + 0.5) * w - x - w / 2) / w;
