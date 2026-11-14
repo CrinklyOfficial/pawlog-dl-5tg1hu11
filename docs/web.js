@@ -23,10 +23,10 @@ if (__pawWeb) {
 // Passcode gate for the public website only (never runs inside the desktop app). Client-side: it keeps casual visitors out;
 // the real data protection is still the Supabase login. The code is stored only as a salted PBKDF2 hash.
 if (__pawWeb) {
-  const SALT = '5b65f2c2fc863560ea36a907622b85bb', HASH = '424332aca2bc22f585e877ec3fb8260dfeb17fb17d416d8f9fa64926cee2dc95', KEY = 'pawlogPass';
+  const SALT = 'e367e780abe6c90424f0188b8a916620', HASH = '11c71fa045a2d0308e1565025293f34632357446ce57f6990aeb58c6e68975d0', KEY = 'pawlogPass';
   const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
   const derive = async (code) => {
-    const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(code.toLowerCase().replace(/[^a-z]/g, '')), 'PBKDF2', false, ['deriveBits']);
+    const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(code.trim().toLowerCase()), 'PBKDF2', false, ['deriveBits']);
     return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new Uint8Array(SALT.match(/../g).map((x) => parseInt(x, 16))), iterations: 200000 }, k, 256));
   };
   let saved = null; try { saved = localStorage.getItem(KEY); } catch { /* private mode */ }
