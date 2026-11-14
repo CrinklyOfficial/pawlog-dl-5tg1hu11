@@ -940,53 +940,87 @@ function setView() {
 const VIEWS = { notes: notesView, gallery: galView, todo: todoView, dashboard: dashView, calendar: calView, log: logView, care: careView, health: healthView, training: trainView, supplies: supView, settings: setView };
 
 /* ---------- liquid-glass tab bar (phone) ---------- */
-// The pill is built once so the glass "lens" can glide between tabs; later renders only move it.
+// The bar is built once. The glass "lens" is moved by a spring (see spring()) so it always starts from where it is now,
+// keeps its speed when a new tap or flick interrupts it, and never bounces unless a flick carried momentum.
+const dock = { x: 0, v: 0, a: null, drag: false, rv: 0 };
+const dockSlot = (pill) => (pill.clientWidth - 12) / (TABS.length + 1);
+function dockSet(pill, x) { dock.x = x; pill.firstElementChild.style.transform = `translate3d(${x.toFixed(2)}px,0,0)`; }
+function dockTo(pill, to, v = 0, damping = 1) {
+  if (dock.a) dock.a.stop();
+  dock.a = null;
+  if (calm() || Math.abs(to - dock.x) < 0.3) { dock.v = 0; dockSet(pill, to); return; }
+  dock.a = spring({ from: dock.x, to, v, response: 0.4, damping, onUpdate: (x, vel) => { dock.v = vel; dockSet(pill, x); }, onDone: () => { dock.a = null; dock.v = 0; } });
+}
 function renderDock() {
   const bar = $('#tabbar');
+  let fresh = false;
   if (!bar.querySelector('.pill')) {
-    const tabs = [...TABS.map((id) => { const [, icon, label] = PAGES.find((x) => x[0] === id); return `<button data-nav="${id}" aria-label="${label}">${ic(icon)}<span>${label.replace('Dashboard', 'Home')}</span></button>`; }), `<button data-act="more" aria-label="More">${ic('more')}<span>More</span></button>`];
+    const tabs = [...TABS.map((id) => { const [, icon, label] = PAGES.find((x) => x[0] === id); return `<button data-nav="${id}" aria-label="${label}">${ic(icon)}<span>${label.replace('Dashboard', 'Home')}</span></button>`; }), `<button data-act="more" aria-label="More" aria-haspopup="dialog">${ic('more')}<span>More</span></button>`];
     bar.innerHTML = `<div class="pill"><i class="lens"></i>${tabs.join('')}</div>`;
     bindDockDrag(bar.firstElementChild);
+    fresh = true;
   }
-  const pill = bar.firstElementChild, moreOpen = !$('#modal').hidden && !!document.querySelector('#modal .sheet.more:not(.closing):not(.addsheet)'), i = moreOpen ? -1 : TABS.indexOf(ui.page);
-  pill.style.setProperty('--i', i < 0 ? TABS.length : i);
-  [...pill.querySelectorAll('button')].forEach((b, n) => b.classList.toggle('on', n === (i < 0 ? TABS.length : i)));
+  const pill = bar.firstElementChild, moreOpen = !$('#modal').hidden && !!document.querySelector('#modal .sheet.more:not(.closing):not(.addsheet)'), i = moreOpen ? -1 : TABS.indexOf(ui.page), n = i < 0 ? TABS.length : i;
+  [...pill.querySelectorAll('button')].forEach((b, k) => {
+    b.classList.toggle('on', k === n);
+    if (b.dataset.nav) { if (k === n) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); } else b.setAttribute('aria-expanded', String(moreOpen));
+  });
+  if (!pill.clientWidth || dock.drag) return;
+  const to = n * dockSlot(pill), v = dock.rv; dock.rv = 0;
+  if (fresh) dockSet(pill, to); else dockTo(pill, to, v, v ? 0.86 : 1);
 }
 
-// Slide a finger across the bar: the lens follows the finger, the tab under it lights up, and lifting commits.
+// Slide a finger across the bar: the lens tracks the finger, the tab under it lights up, and lifting throws it
+// to the tab the flick would land on (same projection the sheets use).
 function bindDockDrag(pill) {
-  const N = TABS.length + 1;
-  let x0 = null, drag = false, swallow = false;
+  const N = TABS.length + 1, btns = () => [...pill.querySelectorAll('button')];
+  let x0 = null, swallow = false, hist = [], tx = 0, raf = 0;
   const idxAt = (x) => { const r = pill.getBoundingClientRect(); return Math.max(0, Math.min(N - 1, Math.floor(((x - r.left) / r.width) * N))); };
-  const follow = (x) => {
-    const r = pill.getBoundingClientRect(), pad = 5, w = (r.width - pad * 2) / N;
-    const e = w * 0.06, c = Math.max(pad + e, Math.min(r.width - pad - w - e, x - r.left - w / 2));
-    pill.style.setProperty('--lx', c - pad + 'px');
-    const hot = idxAt(x);
-    [...pill.querySelectorAll('button')].forEach((b, n) => b.classList.toggle('hot', n === hot));
+  const target = (x) => { const r = pill.getBoundingClientRect(), w = dockSlot(pill); return Math.max(0, Math.min((N - 1) * w, x - r.left - 6 - w / 2)); };
+  const hot = (x) => { const h = idxAt(x); btns().forEach((b, n) => b.classList.toggle('hot', n === h)); };
+  // the lens eases toward the finger (about 45ms lag) so grabbing it from another tab never jumps
+  let t0 = 0;
+  const loop = (now) => {
+    if (!dock.drag) return;
+    const dt = Math.min((now - (t0 || now)) / 1000, 0.05); t0 = now;
+    const nx = dock.x + (tx - dock.x) * (1 - Math.exp(-dt / 0.045));
+    dock.v = dt ? (nx - dock.x) / dt : 0; dockSet(pill, nx);
+    raf = requestAnimationFrame(loop);
   };
-  pill.addEventListener('pointerdown', (e) => { x0 = e.clientX; drag = false; pill.classList.add('press'); });
+  pill.addEventListener('pointerdown', (e) => { x0 = e.clientX; hist = [{ t: e.timeStamp, x: e.clientX }]; pill.classList.add('press'); });
   pill.addEventListener('pointermove', (e) => {
     if (x0 === null) return;
-    if (!drag && Math.abs(e.clientX - x0) > 8) { drag = true; pill.classList.add('drag'); try { pill.setPointerCapture(e.pointerId); } catch { /* ignore */ } }
-    if (drag) follow(e.clientX);
+    hist.push({ t: e.timeStamp, x: e.clientX }); while (hist.length > 2 && e.timeStamp - hist[0].t > 100) hist.shift();
+    if (!dock.drag && Math.abs(e.clientX - x0) > 8) {
+      dock.drag = true; pill.classList.add('drag'); if (dock.a) { dock.a.stop(); dock.a = null; }
+      try { pill.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+      t0 = 0; raf = requestAnimationFrame(loop);
+    }
+    if (dock.drag) { tx = target(e.clientX); hot(e.clientX); }
   });
   const end = (e, commit) => {
     if (x0 === null) return;
-    const was = drag; x0 = null; drag = false;
-    pill.classList.remove('press', 'drag');
-    [...pill.querySelectorAll('button')].forEach((b) => b.classList.remove('hot'));
-    pill.style.removeProperty('--lx');
-    if (was && commit) {
-      swallow = true; setTimeout(() => { swallow = false; }, 0);
-      const n = idxAt(e.clientX);
-      if (navigator.vibrate) navigator.vibrate(6);
-      if (n < TABS.length) { ui.page = TABS[n]; closeModal(); render(); playEnter(); } else openMore();
-    }
+    const was = dock.drag; x0 = null; dock.drag = false; cancelAnimationFrame(raf);
+    pill.classList.remove('press', 'drag'); btns().forEach((b) => b.classList.remove('hot'));
+    if (!was) return;
+    swallow = true; setTimeout(() => { swallow = false; }, 0);
+    if (!commit) { renderDock(); return; }
+    const a = hist[0], b = hist[hist.length - 1], v = b.t > a.t ? ((b.x - a.x) / (b.t - a.t)) * 1000 : 0;
+    const n = idxAt(e.clientX + project(v) * 0.5); // half the projection: the bar is short, don't overshoot intent
+    dock.rv = v; // renderDock hands this to the spring so release has no seam
+    if (navigator.vibrate) navigator.vibrate(6);
+    if (n < TABS.length) { ui.page = TABS[n]; closeModal(); render(); playEnter(); } else openMore();
   };
   pill.addEventListener('pointerup', (e) => end(e, true));
   pill.addEventListener('pointercancel', (e) => end(e, false));
   pill.addEventListener('click', (e) => { if (swallow) { e.stopPropagation(); e.preventDefault(); } }, true);
+  // arrow keys move between tabs (external keyboards, VoiceOver switch control)
+  pill.addEventListener('keydown', (e) => {
+    const k = { ArrowLeft: -1, ArrowRight: 1, Home: -N, End: N }[e.key]; if (!k) return;
+    const b = btns(), cur = b.indexOf(document.activeElement); if (cur < 0) return;
+    e.preventDefault(); b[Math.max(0, Math.min(N - 1, Math.abs(k) === N ? (k < 0 ? 0 : N - 1) : cur + k))].focus();
+  });
+  new ResizeObserver(() => { if (!dock.drag && !dock.a && pill.clientWidth) { const on = btns().findIndex((b) => b.classList.contains('on')); dockSet(pill, Math.max(0, on) * dockSlot(pill)); } }).observe(pill);
 }
 
 bindHomeReorder();

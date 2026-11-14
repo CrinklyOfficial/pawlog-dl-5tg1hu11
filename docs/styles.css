@@ -865,3 +865,33 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   .card, .group, .type, .mgrid button, .mprofile, .btn:not(.primary) { box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
   nav.tabbar .pill { background: #1c1c1e; box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); }
 }
+
+/* ---- tab bar refinement: spring-driven lens (JS), edge-lit glass, calm icon motion ---- */
+@media (max-width: 700px) {
+  nav.tabbar .pill { box-shadow: 0 6px 24px rgba(0,0,0,.26); transition: none; }
+  nav.tabbar .pill.press { transform: none; }
+  /* light catching the rim: bright on top, faint at the sides, a little back at the bottom */
+  nav.tabbar .pill::after { display: block; content: ""; position: absolute; inset: 0; border-radius: inherit; padding: .75px; pointer-events: none;
+    background: linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,.07) 42%, rgba(255,255,255,.04) 62%, rgba(255,255,255,.2));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+  /* position comes from JS; only look changes are transitioned, with no overshoot */
+  nav.tabbar .lens { transform: none; will-change: transform; transition: scale .32s cubic-bezier(.2,.8,.2,1), background-color .25s, box-shadow .25s;
+    background: rgba(255,255,255,.15); box-shadow: inset 0 .5px 0 rgba(255,255,255,.38), inset 0 0 0 .5px rgba(255,255,255,.18); }
+  nav.tabbar .pill.drag .lens { transition: scale .25s cubic-bezier(.2,.8,.2,1), background-color .2s; scale: 1.1 1.08; background: rgba(255,255,255,.24); box-shadow: inset 0 .5px 0 rgba(255,255,255,.5), inset 0 0 0 .5px rgba(255,255,255,.3), 0 6px 18px rgba(0,0,0,.3); }
+  nav.tabbar button { color: rgba(255,255,255,.66); transition: color .22s ease, opacity .12s; }
+  nav.tabbar button .ic { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+  nav.tabbar button.on, nav.tabbar button.hot { color: #fff; }
+  nav.tabbar button.hot .ic { transform: none; }
+  nav.tabbar .pill:not(.drag) button.on .ic { transform: none; animation: tabpop .34s cubic-bezier(.2,.8,.2,1); }
+  nav.tabbar button:active { opacity: .7; }
+  nav.tabbar button:active .ic { transform: scale(.92); }
+  nav.tabbar button:focus-visible { outline: 2px solid rgba(255,255,255,.75); outline-offset: -3px; }
+  @keyframes tabpop { 0% { transform: scale(.9); } 55% { transform: scale(1.06); } 100% { transform: none; } }
+}
+@media (max-width: 700px) and (hover: hover) { nav.tabbar button:not(.on):hover { color: rgba(255,255,255,.92); } }
+@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
+  nav.tabbar .pill:not(.drag) button.on .ic, nav.tabbar button:active .ic { animation: none !important; transform: none; }
+  nav.tabbar .pill.drag .lens { scale: 1; }
+}
+@media (max-width: 700px) and (prefers-reduced-transparency: reduce) { nav.tabbar .pill::after { display: none; } nav.tabbar .lens { background: #48484a; } }
+@media (max-width: 700px) and (prefers-contrast: more) { nav.tabbar button { color: #fff; } nav.tabbar .lens { background: rgba(255,255,255,.3); } }
