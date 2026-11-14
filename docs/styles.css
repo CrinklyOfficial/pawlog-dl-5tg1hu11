@@ -903,31 +903,33 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   /* overflow: the sidebar's `nav { overflow-y: auto }` would clip the swollen bar and lens to the wrapper */
   nav.tabbar { left: 20px; right: 20px; bottom: max(10px, calc(env(safe-area-inset-bottom) - 14px)); overflow: visible; }
   /* the bar's glass lives on ::before, not on the bar: a backdrop-filter on the bar would clip the lens's own glass to the bar's edge */
-  nav.tabbar .pill { height: 57px; padding: 4px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+  nav.tabbar .pill { height: 62px; padding: 4px; --lift: 0; transition: --lift .42s var(--spring); background: none; -webkit-backdrop-filter: none; backdrop-filter: none;
     box-shadow: 0 6px 20px rgba(0,0,0,.22); }
   nav.tabbar .pill::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-    background: rgba(255,255,255,.1); -webkit-backdrop-filter: blur(8px) saturate(1.8) brightness(1.05); backdrop-filter: blur(8px) saturate(1.8) brightness(1.05); }
+    background: rgba(255,255,255,.08); -webkit-backdrop-filter: blur(3px) saturate(1.6) brightness(1.05); backdrop-filter: blur(3px) saturate(1.6) brightness(1.05); }
   /* the bar swells by growing its glass + rim layers (not by scaling the bar: WebKit draws a scaled backdrop-filter into a square-cornered box) */
   nav.tabbar .pill::before, nav.tabbar .pill::after { transition: inset .42s var(--spring); }
-  nav.tabbar .pill.lift::before, nav.tabbar .pill.lift::after { inset: -1px -6.5px; }
+  nav.tabbar .pill.lift { --lift: 1; }
+  nav.tabbar .pill.lift::before, nav.tabbar .pill.lift::after { inset: 3.5px -7px; }
+  nav.tabbar .pill.lift::after { padding: .5px; }
   nav.tabbar .lens, nav.tabbar .pill.drag .lens { will-change: translate, scale; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 5);
     scale: 1; transition: scale .42s var(--spring), background-color .35s ease, box-shadow .35s ease;
     background: rgba(0,0,0,.5); -webkit-backdrop-filter: none; backdrop-filter: none;
     box-shadow: inset 0 0 0 .5px rgba(255,255,255,.1), inset 0 .5px 0 rgba(255,255,255,.12); }
   nav.tabbar .pill.lift .lens, nav.tabbar .pill.drag .lens { scale: 1.28 1.34; background: radial-gradient(ellipse at 50% 35%, rgba(255,255,255,.16), rgba(255,255,255,.05) 70%); /* no backdrop-filter: WebKit would clip it to the bar */
     box-shadow: inset 0 .75px 1px rgba(255,255,255,.7), inset 0 -.75px 1px rgba(255,255,255,.35), inset 3px 0 5px -2px rgba(90,170,255,.55), inset -3px 0 5px -2px rgba(255,150,90,.45), 0 4px 14px rgba(0,0,0,.22); }
-  nav.tabbar .pill button { min-height: 0; gap: 3px; font-size: 10px; font-weight: 600; letter-spacing: .01em; color: #fff; text-shadow: none; scale: 1;
-    transition: color .3s ease, scale .42s var(--spring), opacity .12s; }
+  nav.tabbar .pill button { min-height: 0; gap: 3px; font-size: 10px; font-weight: 600; letter-spacing: .01em; color: #fff; text-shadow: none; scale: calc(1 + .26 * var(--m, 0) * var(--lift));
+    transition: color .3s ease, opacity .12s; }
   /* the sidebar's `nav button:hover` fill is sticky on touch and out-ranks the reset above: kill it here */
   nav.tabbar .pill button, nav.tabbar .pill button:hover:not(.on), nav.tabbar .pill button.on { background: none; box-shadow: none; }
   nav.tabbar .pill button .ic { width: 24px; height: 24px; filter: none; animation: none; }
-  nav.tabbar .pill button.on, nav.tabbar .pill button.hot { color: #0a84ff; }
-  nav.tabbar .pill.lift button.on, nav.tabbar .pill.lift button.hot { color: #5ab4ff; scale: 1.16; }
-  nav.tabbar .pill.drag button.on:not(.hot) { color: #fff; scale: 1; }
-  #toast { bottom: calc(max(10px, env(safe-area-inset-bottom) - 14px) + 57px + 12px); }
+  nav.tabbar .pill button.on, nav.tabbar .pill button.hot { color: #8b73ff; } /* the app's purple, lightened so 10pt text stays readable on the dark lens */
+  nav.tabbar .pill.lift button.on, nav.tabbar .pill.lift button.hot { color: #b8a8ff; }
+  nav.tabbar .pill.drag button.on:not(.hot) { color: #fff; }
+  #toast { bottom: calc(max(10px, env(safe-area-inset-bottom) - 14px) + 62px + 12px); }
 }
 @media (max-width: 700px) and (prefers-reduced-motion: reduce) {
-  nav.tabbar .pill.lift button.on, nav.tabbar .pill.lift button.hot { scale: 1; } nav.tabbar .pill.lift::before, nav.tabbar .pill.lift::after { inset: 0; }
+  nav.tabbar .pill.lift { --lift: 0; } nav.tabbar .pill.lift::before, nav.tabbar .pill.lift::after { inset: 0; }
   nav.tabbar .pill.lift .lens, nav.tabbar .pill.drag .lens { scale: 1; }
 }
 @media (max-width: 700px) and (prefers-reduced-transparency: reduce) {
@@ -935,5 +937,7 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   nav.tabbar .pill.lift .lens, nav.tabbar .pill.drag .lens { background: #3a3a3c; }
 }
 @media (max-width: 700px) and (prefers-contrast: more) {
-  nav.tabbar .pill::before { background: #1c1c1e; -webkit-backdrop-filter: none; backdrop-filter: none; } nav.tabbar .pill button { color: #fff; } nav.tabbar .pill button.on { color: #5ab4ff; }
+  nav.tabbar .pill::before { background: #1c1c1e; -webkit-backdrop-filter: none; backdrop-filter: none; } nav.tabbar .pill button { color: #fff; } nav.tabbar .pill button.on { color: #b8a8ff; }
 }
+
+@property --lift { syntax: '<number>'; inherits: true; initial-value: 0; }

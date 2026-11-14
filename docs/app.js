@@ -952,7 +952,15 @@ function dockLift(pill, on, ms = 0) {
   if (!on || ms) dock.lt = setTimeout(() => pill.classList.remove('lift'), on ? ms : 0);
 }
 // lens is positioned with `translate`, which CSS applies before `scale`: the lens isn't shoved sideways when it swells
-function dockSet(pill, x) { dock.x = x; pill.firstElementChild.style.translate = `${x.toFixed(2)}px 0`; }
+function dockSet(pill, x) {
+  dock.x = x; pill.firstElementChild.style.translate = `${x.toFixed(2)}px 0`;
+  // our own magnifier: each tab swells according to how near the lens centre is (CSS scales it by --lift while held)
+  const w = dockSlot(pill);
+  [...pill.querySelectorAll('button')].forEach((b, k) => {
+    const d = Math.abs((k + 0.5) * w - x - w / 2) / w;
+    b.style.setProperty('--m', (Math.max(0, 1 - d / 1.3) ** 1.6).toFixed(3));
+  });
+}
 function dockTo(pill, to, v = 0, damping = 0.74) {
   if (dock.a) dock.a.stop();
   dock.a = null;
