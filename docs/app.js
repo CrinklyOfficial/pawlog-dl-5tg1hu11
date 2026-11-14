@@ -491,7 +491,9 @@ function bindTapGuard() {
   document.addEventListener('click', (e) => { if (grid(e) && down && (down.bad || scrolling)) { e.preventDefault(); e.stopPropagation(); clearTimeout(ui.quickT); } }, true);
 }
 bindTapGuard();
-bindSheetDrag();
+bindSheets();
+dynType(); addEventListener('resize', dynType); document.addEventListener('visibilitychange', dynType);
+document.addEventListener('touchstart', () => {}, { passive: true }); // lets :active fire instantly on iOS
 
 function phoneHero(p, d) {
   const photo = p.photo ? `<img class="hbg" src="${esc(p.photo)}" alt="">` : `<div class="hbg art">${dogArt('awake')}</div>`;
@@ -1042,37 +1044,98 @@ function openMore() {
   $('#modal').hidden = false;
   renderDock();
 }
+/* ---------- motion: springs that start from the live value and inherit the finger's velocity ---------- */
+// response = seconds to reach the target; damping 1 = no overshoot (Apple's defaults)
+function spring({ from, to, v = 0, response = 0.35, damping = 1, onUpdate, onDone }) {
+  const k = (2 * Math.PI / response) ** 2, c = 2 * damping * Math.sqrt(k);
+  let x = from, vel = v, last = performance.now(), raf = 0, dead = false;
+  const step = (now) => {
+    if (dead) return;
+    const dt = Math.min((now - last) / 1000, 0.032); last = now;
+    for (let n = Math.ceil(dt / 0.004) || 1, h = dt / (n || 1); n > 0; n--) { vel += (-k * (x - to) - c * vel) * h; x += vel * h; }
+    onUpdate(x, vel);
+    if (Math.abs(x - to) < 0.3 && Math.abs(vel) < 8) { onUpdate(to, 0); if (onDone) onDone(); return; }
+    raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+  return { stop() { dead = true; cancelAnimationFrame(raf); } };
+}
+const project = (v, d = 0.998) => (v / 1000) * d / (1 - d); // where a flick at v px/s would come to rest
+const rubber = (o, dim, c = 0.55) => (o * dim * c) / (dim + c * Math.abs(o)); // resistance past an edge
+const isPhone = () => matchMedia('(max-width:700px)').matches;
+const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const sheetFx = {
+  setY(sh, y) {
+    sh._y = y; sh.style.transform = y ? `translate3d(0,${y.toFixed(1)}px,0)` : '';
+    $('#modal').style.setProperty('--p', String(Math.max(0, Math.min(1, 1 - y / (sh.offsetHeight || 1)))));
+  },
+  to(sh, target, v, done) {
+    if (sh._a) sh._a.stop();
+    sh._a = spring({ from: sh._y || 0, to: target, v, response: target ? 0.36 : 0.34, onUpdate: (x) => sheetFx.setY(sh, x), onDone: () => { sh._a = null; if (done) done(); } });
+  },
+  hide() { const m = $('#modal'); m.hidden = true; m.innerHTML = ''; m.style.removeProperty('--p'); renderDock(); },
+  dismiss(sh, v) {
+    if (sh.classList.contains('closing')) return;
+    sh.classList.add('closing'); renderDock();
+    sheetFx.to(sh, sh.offsetHeight + 24, v, () => { if (sh.isConnected && sh.classList.contains('closing')) sheetFx.hide(); });
+  },
+};
+
 function closeModal(now) {
   const m = $('#modal'), sh = m.firstElementChild;
-  const anim = !now && !m.hidden && sh && matchMedia('(max-width:700px)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!anim) { m.hidden = true; m.innerHTML = ''; renderDock(); return; }
-  if (sh.classList.contains('closing')) return;
-  sh.classList.add('closing'); sh.style.transform = '';
-  setTimeout(() => { if (sh.isConnected && sh.classList.contains('closing')) { m.hidden = true; m.innerHTML = ''; renderDock(); } }, 280);
+  if (now || m.hidden || !sh || !sh._init || !isPhone() || calm()) { if (sh && sh._a) sh._a.stop(); sheetFx.hide(); return; }
+  sheetFx.dismiss(sh, 0);
 }
 
-// Drag a sheet down by its top bar to dismiss it (phone).
-function bindSheetDrag() {
-  const ov = $('#modal'); let sh = null, y0 = 0, dy = 0, t0 = 0;
+// Sheets rise on a spring when they appear (any open path), and can be grabbed at any instant.
+function bindSheets() {
+  const ov = $('#modal');
+  new MutationObserver(() => {
+    const sh = ov.firstElementChild;
+    if (!sh || !sh.classList.contains('sheet') || sh._init || ov.hidden || !isPhone() || calm()) return;
+    sh._init = true; sh.style.animation = 'none';
+    sheetFx.setY(sh, sh.offsetHeight || innerHeight);
+    sheetFx.to(sh, 0, 0);
+  }).observe(ov, { childList: true });
+
+  let sh = null, sx = 0, sy = 0, y0 = 0, live = false, hist = [];
   ov.addEventListener('touchstart', (e) => {
     const s = e.target.closest('.sheet');
-    if (!s || e.touches.length !== 1 || s.classList.contains('closing') || e.touches[0].clientY - s.getBoundingClientRect().top > 64) return;
-    sh = s; y0 = e.touches[0].clientY; dy = 0; t0 = Date.now(); s.style.animation = 'none'; s.style.transition = 'none';
+    if (!s || e.touches.length !== 1 || !s._init) return;
+    const t = e.touches[0], head = t.clientY - s.getBoundingClientRect().top < 64;
+    if (!head && !(s.scrollTop <= 0 && !e.target.closest('input,textarea,select'))) return;
+    sh = s; sx = t.clientX; sy = t.clientY; hist = [{ t: e.timeStamp, y: sy }]; y0 = s._y || 0; live = false;
+    if (s._a && Math.abs(y0) > 2) { s._a.stop(); s._a = null; s.classList.remove('closing'); live = true; } // grabbed mid-flight
   }, { passive: true });
   ov.addEventListener('touchmove', (e) => {
     if (!sh) return;
-    dy = Math.max(0, e.touches[0].clientY - y0);
-    if (dy > 4) e.preventDefault();
-    sh.style.transform = `translateY(${dy}px)`;
+    const t = e.touches[0], dy = t.clientY - sy;
+    if (!live) {
+      if (dy > 10 && dy > Math.abs(t.clientX - sx) * 1.5 && sh.scrollTop <= 0) { live = true; sy = t.clientY; y0 = sh._y || 0; if (sh._a) { sh._a.stop(); sh._a = null; } }
+      else return;
+    }
+    e.preventDefault();
+    const y = y0 + (t.clientY - sy);
+    sheetFx.setY(sh, y < 0 ? -rubber(-y, sh.offsetHeight) : y);
+    hist.push({ t: e.timeStamp, y: t.clientY }); while (hist.length > 2 && e.timeStamp - hist[0].t > 100) hist.shift();
   }, { passive: false });
   const end = () => {
     if (!sh) return;
     const s = sh; sh = null;
-    s.style.transition = 'transform .3s cubic-bezier(.32,.72,0,1)';
-    if (dy > 110 || dy / Math.max(1, Date.now() - t0) > 0.6) { s.style.transform = 'translateY(105%)'; s.classList.add('closing'); s.style.animation = 'none'; setTimeout(() => closeModal(true), 300); }
-    else { s.style.transform = ''; setTimeout(() => { s.style.transition = ''; s.style.animation = ''; }, 320); }
+    if (!live) return;
+    const a = hist[0], b = hist[hist.length - 1], v = b.t > a.t ? ((b.y - a.y) / (b.t - a.t)) * 1000 : 0;
+    const h = s.offsetHeight, y = s._y || 0;
+    if (navigator.vibrate && y + project(v) > Math.min(h / 2, 260)) navigator.vibrate(5);
+    if (y + project(v) > Math.min(h / 2, 260)) sheetFx.dismiss(s, v); else sheetFx.to(s, 0, v);
   };
   ov.addEventListener('touchend', end); ov.addEventListener('touchcancel', end);
+}
+
+// Dynamic Type: follow the iOS text-size setting (CSS multiplies phone font sizes by --dt).
+function dynType() {
+  const r = parseFloat(getComputedStyle(document.documentElement).fontSize) / 17;
+  document.documentElement.style.setProperty('--dt', String(Math.min(1.6, Math.max(1, r || 1))));
 }
 
 function openModal(title, body, onSubmit, saveLabel = 'Save', extra = '') {
