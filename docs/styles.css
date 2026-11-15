@@ -1097,6 +1097,7 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 .iconbtn:hover { background: rgba(255,255,255,.12); color: var(--text); } .iconbtn:active { transform: scale(.92); }
 .iconbtn .ic { width: 17px; height: 17px; vertical-align: 0; }
 .search { display: none; }
+.tabhead { display: none; }
 @media (min-width: 701px) {
   /* tab header: dashboard only, a glass extension of the sidebar (same material, purple fade) */
   div.app { grid-template-rows: auto minmax(0, 1fr); }
@@ -1192,3 +1193,79 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 @keyframes hit { 0% { box-shadow: 0 0 0 0 rgba(179,165,255,0); } 18% { box-shadow: 0 0 0 3px rgba(179,165,255,.95), 0 0 34px 6px rgba(123,92,255,.65); background-color: rgba(123,92,255,.28); } 100% { box-shadow: 0 0 0 0 rgba(179,165,255,0); } }
 .hit { animation: hit 2.4s ease-out 1; border-radius: 12px; }
 .sempty.hint { padding: 22px 12px; }
+
+/* ============ Phone: collapsing tab bar (search pill + folding tabs) and search page ============
+   Motion copied from the iOS 26 Podcasts bar: tabs fade, the bar shrinks to a circle on the left, the search pill glides down
+   between that circle and a More circle on the right. Glass elements grow by size/inset, never by scale (WebKit squares scaled blur). */
+@media (max-width: 700px) {
+  :root { --mo: cubic-bezier(.32, .72, 0, 1); }
+  nav.tabbar { height: 62px; overflow: visible; }
+  nav.tabbar .pill { position: absolute; left: 0; bottom: 0; width: 100%; transition: width .6s var(--mo), height .6s var(--mo), bottom .6s var(--mo), --lift .42s var(--spring); }
+  nav.tabbar.mini .pill { width: 54px; height: 54px; bottom: 4px; padding: 0; }
+  nav.tabbar .pill > button { transition: color .3s ease, opacity .3s .22s; }
+  nav.tabbar.mini .pill > button { opacity: 0; pointer-events: none; transition: color .3s ease, opacity .14s; }
+  nav.tabbar .lens { transition: scale .42s var(--spring), background-color .35s ease, box-shadow .35s ease, opacity .14s; }
+  nav.tabbar.mini .lens { opacity: 0; }
+  nav.tabbar .solo { position: absolute; left: 0; top: 0; width: 54px; height: 100%; display: grid; place-items: center; color: #8b73ff; opacity: 0; pointer-events: none; transition: opacity .14s; }
+  nav.tabbar.mini .solo { opacity: 1; transition: opacity .25s .24s; }
+  nav.tabbar .solo .ic { width: 25px; height: 25px; vertical-align: 0; }
+  /* the search pill and More circle share the bar's glass recipe */
+  nav.tabbar .sp, nav.tabbar .mr { position: absolute; z-index: 2; display: flex; align-items: center; border: 0; margin: 0; color: #fff; pointer-events: auto; border-radius: 999px; font: inherit; text-align: left;
+    background: rgba(255,255,255,.08); -webkit-backdrop-filter: blur(3px) saturate(1.6) brightness(1.05); backdrop-filter: blur(3px) saturate(1.6) brightness(1.05);
+    box-shadow: 0 6px 20px rgba(0,0,0,.22), inset 0 .75px 0 rgba(255,255,255,.3), inset 0 0 0 .5px rgba(255,255,255,.16); }
+  nav.tabbar .sp:hover, nav.tabbar .mr:hover { background: rgba(255,255,255,.08); }
+  nav.tabbar .sp { flex-direction: row; justify-content: flex-start; width: auto; min-height: 0; left: 0; right: 0; bottom: 70px; height: 52px; gap: 10px; padding: 0 20px; font-size: 17px; font-weight: 500; color: rgba(235,235,245,.62);
+    transition: left .6s var(--mo), right .6s var(--mo), bottom .6s var(--mo), height .6s var(--mo), padding .6s var(--mo); }
+  nav.tabbar .sp .ic { width: 20px; height: 20px; vertical-align: 0; flex: none; color: rgba(235,235,245,.7); }
+  nav.tabbar .sp span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  nav.tabbar.mini .sp { left: 62px; right: 62px; bottom: 4px; height: 54px; padding: 0 18px; }
+  nav.tabbar .mr { flex-direction: row; min-height: 0; right: 0; bottom: 4px; width: 54px; height: 54px; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .16s; }
+  nav.tabbar.mini .mr { opacity: 1; pointer-events: auto; transition: opacity .3s .2s; }
+  nav.tabbar .mr .ic { width: 24px; height: 24px; vertical-align: 0; }
+  main { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
+  #toast { bottom: calc(max(10px, env(safe-area-inset-bottom) - 14px) + 138px); }
+  body:has(#modal .sheet.more:not(.addsheet):not(.closing)) nav.tabbar .sp { opacity: 0; pointer-events: none; }
+
+  /* search page */
+  .spage { position: fixed; left: 0; right: 0; top: 0; height: 100%; z-index: 95; display: flex; flex-direction: column; opacity: 0; pointer-events: none;
+    background: rgba(255,255,255,.1); -webkit-backdrop-filter: blur(34px) saturate(1.6); backdrop-filter: blur(34px) saturate(1.6); clip-path: inset(0 0 0 0 round 0);
+    transition: clip-path .6s var(--mo), background-color .5s, opacity .15s; }
+  .spage.on { opacity: 1; pointer-events: auto; }
+  .spage.full { background: rgba(10,10,16,.95); }
+  .sp-top, .sp-body { opacity: 0; transform: translateY(12px); transition: opacity .3s, transform .5s var(--mo); }
+  .spage.full .sp-top, .spage.full .sp-body { opacity: 1; transform: none; transition-delay: .12s; }
+  .sp-top { display: flex; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 10px) 16px 10px; }
+  .sp-field { flex: 1; display: flex; align-items: center; gap: 9px; height: 46px; padding: 0 14px; border-radius: 23px; color: rgba(235,235,245,.7); margin: 0;
+    background: rgba(255,255,255,.1); box-shadow: inset 0 .75px 0 rgba(255,255,255,.28), inset 0 0 0 .5px rgba(255,255,255,.14); }
+  .sp-field .ic { width: 20px; height: 20px; vertical-align: 0; flex: none; }
+  .sp-field input, .sp-field input:focus { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; outline: none; font-size: 17px; color: #fff; -webkit-appearance: none; appearance: none; }
+  .sp-field input::-webkit-search-cancel-button { display: none; }
+  .sp-x { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.22); color: #000; }
+  .sp-x[hidden] { display: none; }
+  .sp-x .ic { width: 13px; height: 13px; vertical-align: 0; stroke-width: 2.4; }
+  .sp-cancel { padding: 10px 2px; border: 0; background: none; color: #b8a8ff; font-size: 17px; font-weight: 500; }
+  .sp-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px calc(env(safe-area-inset-bottom) + 24px); }
+  .sp-h { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 4px 6px; }
+  .sp-h b { font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
+  .sp-clr { border: 0; background: none; color: #b8a8ff; font-size: 16px; padding: 4px; }
+  .srec { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 4px; border: 0; border-bottom: .5px solid rgba(255,255,255,.1); background: none; color: #fff; font-size: 17px; text-align: left; }
+  .srec .ic { width: 19px; height: 19px; vertical-align: 0; color: rgba(235,235,245,.5); flex: none; }
+  .sp-empty { display: grid; justify-items: center; gap: 4px; padding: 56px 20px; text-align: center; color: var(--text2); }
+  .sp-empty .ic { width: 34px; height: 34px; margin-bottom: 8px; color: rgba(235,235,245,.4); vertical-align: 0; }
+  .sp-empty b { color: #fff; font-size: 18px; }
+  .spage .sgrp { padding: 16px 4px 6px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: rgba(235,235,245,.5); }
+  .spage .sit { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 6px; border: 0; border-radius: 16px; background: none; color: #fff; text-align: left; transition: background-color .15s; }
+  .spage .sit:active { background: rgba(255,255,255,.12); }
+  .spage .sico { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 12px; background: rgba(255,255,255,.09); color: #b8a8ff; }
+  .spage .sico .ic { width: 20px; height: 20px; vertical-align: 0; }
+  .spage .stxt { flex: 1; min-width: 0; display: grid; }
+  .spage .stxt b { font-size: 16.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .spage .stxt small { font-size: 14px; color: rgba(235,235,245,.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .spage mark { background: none; color: #fff; text-decoration: underline; text-decoration-color: #b8a8ff; text-underline-offset: 3px; }
+  .spage .sit.new { animation: sitin2 .45s cubic-bezier(.2,.9,.3,1) both; animation-delay: min(calc(var(--i) * 45ms), 270ms); }
+  @keyframes sitin2 { from { opacity: 0; transform: translateY(16px) scale(.97); filter: blur(5px); } to { opacity: 1; transform: none; filter: none; } }
+}
+@media (max-width: 700px) and (prefers-reduced-transparency: reduce) {
+  nav.tabbar .sp, nav.tabbar .mr { background: #2c2c2e; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .spage, .spage.full { -webkit-backdrop-filter: none; backdrop-filter: none; background: #0a0a10; }
+}

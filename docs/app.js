@@ -975,7 +975,7 @@ function renderDock() {
   let fresh = false;
   if (!bar.querySelector('.pill')) {
     const tabs = [...TABS.map((id) => { const [, icon, label] = PAGES.find((x) => x[0] === id); return `<button data-nav="${id}" aria-label="${label}">${ic(icon)}<span>${label.replace('Dashboard', 'Home')}</span></button>`; }), `<button data-act="more" aria-label="More" aria-haspopup="dialog">${ic('more')}<span>More</span></button>`];
-    bar.innerHTML = `<div class="pill"><i class="lens"></i>${tabs.join('')}</div>`;
+    bar.innerHTML = `<div class="pill"><i class="lens"></i>${tabs.join('')}<span class="solo" aria-hidden="true"></span></div><button type="button" class="sp" data-act="search" aria-label="Search">${ic('search')}<span>Search Pawlog</span></button><button type="button" class="mr" data-act="more" aria-label="More" tabindex="-1">${ic('more')}</button>`;
     bindDockDrag(bar.firstElementChild);
     fresh = true;
   }
@@ -984,6 +984,7 @@ function renderDock() {
     b.classList.toggle('on', k === n);
     if (b.dataset.nav) { if (k === n) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); } else b.setAttribute('aria-expanded', String(moreOpen));
   });
+  pill.querySelector('.solo').innerHTML = ic(n < TABS.length ? PAGES.find((x) => x[0] === TABS[n])[1] : 'more');
   if (!pill.clientWidth || dock.drag) return;
   const to = n * dockSlot(pill), v = dock.rv; dock.rv = 0;
   if (fresh) dockSet(pill, to);
@@ -1045,6 +1046,33 @@ function bindDockDrag(pill) {
   new ResizeObserver(() => { if (!dock.drag && !dock.a && pill.clientWidth) { const on = btns().findIndex((b) => b.classList.contains('on')); dockSet(pill, Math.max(0, on) * dockSlot(pill)); } }).observe(pill);
 }
 
+
+/* ---------- collapsing tab bar (phone) ----------
+   At the top of a page: search pill above the full tab bar. Scroll down and the bar folds into [current tab] [search] [More];
+   scroll up, reach the top, or tap the left circle and it unfolds again. */
+const tb = { mini: false, y: 0, acc: 0, page: '', lock: 0 };
+function tabMini(on) {
+  if (on === tb.mini) return;
+  tb.mini = on; $('#tabbar').classList.toggle('mini', on);
+  $('#tabbar .mr').tabIndex = on ? 0 : -1;
+  if (!on) tb.acc = 0;
+}
+$('main').addEventListener('scroll', () => {
+  if (!isPhone() || !$('#modal').hidden) return;
+  const y = $('main').scrollTop, d = y - tb.y; tb.y = y;
+  if (y < 24) { tabMini(false); return; }
+  if (y < 0 || Math.abs(d) < 1) return;
+  tb.acc = Math.sign(d) === Math.sign(tb.acc) ? tb.acc + d : d;
+  if (tb.acc > 16 && y > 70) tabMini(true); else if (tb.acc < -16) tabMini(false);
+}, { passive: true });
+// the folded left circle is the selected tab: tapping it unfolds the bar instead of switching tabs
+$('#tabbar').addEventListener('pointerdown', (e) => {
+  if (!tb.mini || !e.target.closest('.pill')) return;
+  e.stopPropagation(); e.preventDefault(); tb.lock = e.timeStamp; tabMini(false);
+}, true);
+// the tap that unfolds the bar must not also land on a tab that appears under the finger
+$('#tabbar').addEventListener('click', (e) => { if (tb.lock && e.timeStamp - tb.lock < 500 && e.target.closest('.pill')) { e.stopPropagation(); e.preventDefault(); } }, true);
+
 bindHomeReorder();
 function render() {
   $('#nav').innerHTML = PAGES.filter(([id]) => id !== 'settings').map(([id, icon, label]) => `${NAV_SECTIONS[id] ? `<div class="navlbl">${NAV_SECTIONS[id]}</div>` : ''}<button data-nav="${id}" title="${label}" class="${id === ui.page ? 'on' : ''}" >${ic(icon)}<span class="lbl">${label}</span></button>`).join('');
@@ -1053,6 +1081,7 @@ function render() {
   const menu = ui.petMenu ? `<div class="menu" role="menu">${pets().map((x) => `<button class="mi" role="menuitem" data-act="pick-pet" data-id="${x.id}">${avatar(x, 'ava sm')}<span class="grow">${esc(x.name)}</span>${x.id === ui.petId ? ic('check') : ''}</button>`).join('')}<hr><button class="mi" role="menuitem" data-act="new-pet">${ic('plus')}<span class="grow">Add a pet…</span></button></div>` : '';
   $('#brand').innerHTML = `<div class="brandwrap"><button class="brandbtn" data-act="pet-menu" aria-haspopup="menu" aria-expanded="${ui.petMenu}"><img class="ava app" src="assets/icon.png" alt=""><span class="lbl bname"><b>Pawlog</b><small>${esc(pr.name || '')}</small></span><span class="lbl chev">${ic('chev-down')}</span></button>${menu}</div>`;
   document.body.dataset.page = ui.page;
+  if (tb.page !== ui.page) { tb.page = ui.page; tabMini(false); tb.y = 0; }
   const [, , label] = PAGES.find((x) => x[0] === ui.page);
   $('#title').textContent = ui.page === 'dashboard' ? 'Today' : label;
   const chip = $('#petchip');
@@ -1558,6 +1587,7 @@ const actions = {
   'pet-menu': () => { ui.petMenu = !ui.petMenu; },
   'pick-pet': (el, id) => setPet(id),
   more: () => openMore(),
+  search: () => spOpen(),
   tour: () => { closeModal(); maybeOnboard(true); },
   'more-pet': (el, id) => { setPet(id); closeModal(); },
   'new-pet': () => { ui.petMenu = false; openProfileModal(true); },
@@ -1725,6 +1755,9 @@ function searchOpen(on) {
 function searchGo(k) {
   const it = Q.items[k]; if (!it) return;
   $('#q').value = ''; searchOpen(false);
+  goHit(it);
+}
+function goHit(it) {
   ui.page = it.page;
   if (it.day) ui.logDay = it.day;
   if (it.date) { const d = parseYmd(it.date); ui.calMonth = new Date(d.getFullYear(), d.getMonth(), 1); ui.selDay = it.date; }
@@ -1756,4 +1789,71 @@ function searchFlash(it) {
     });
     document.addEventListener('mousedown', (e) => { if (Q.open && !e.target.closest('#search')) { q.value = ''; searchOpen(false); } });
   }
+}
+
+/* ---------- phone search page: grows out of the search pill; recents until you type, then live results ---------- */
+const RECENT_KEY = 'pawlogRecents';
+const recents = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch { return []; } };
+const setRecents = (a) => { try { localStorage.setItem(RECENT_KEY, JSON.stringify(a.slice(0, 8))); } catch { /* private mode */ } };
+const addRecent = (q) => { q = q.trim(); if (q) setRecents([q, ...recents().filter((x) => x.toLowerCase() !== q.toLowerCase())]); };
+const SP = { el: null, open: false, items: [], shown: new Set() };
+const hlq = (t, q) => { const e = esc(t), ws = q.split(/\s+/).filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); return ws.length ? e.replace(new RegExp('(' + ws.join('|') + ')', 'ig'), '<mark>$1</mark>') : e; };
+function spEl() {
+  if (SP.el) return SP.el;
+  const el = SP.el = document.createElement('div');
+  el.id = 'spage'; el.className = 'spage'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Search'); el.inert = true;
+  el.innerHTML = `<div class="sp-top"><label class="sp-field">${ic('search')}<input id="sq" type="search" placeholder="Search Pawlog" enterkeyhint="search" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Search"><button type="button" class="sp-x" aria-label="Clear search" hidden>${ic('x')}</button></label><button type="button" class="sp-cancel">Cancel</button></div><div class="sp-body" id="sbody"></div>`;
+  document.body.appendChild(el);
+  const q = el.querySelector('#sq');
+  q.addEventListener('input', spDraw);
+  q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { addRecent(q.value); q.blur(); } else if (e.key === 'Escape') spClose(); });
+  el.querySelector('.sp-cancel').addEventListener('click', spClose);
+  el.querySelector('.sp-x').addEventListener('click', () => { q.value = ''; spDraw(); q.focus(); });
+  el.querySelector('#sbody').addEventListener('click', (e) => {
+    const r = e.target.closest('.srec'), h = e.target.closest('.sit'), c = e.target.closest('.sp-clr');
+    if (c) { setRecents([]); spDraw(); }
+    else if (r) { q.value = r.dataset.q; spDraw(); q.focus(); }
+    else if (h) { addRecent(q.value); const it = SP.items[+h.dataset.k]; spClose(true); if (it) setTimeout(() => goHit(it), 260); }
+  });
+  // the keyboard shrinks the visual viewport on iOS: keep the page (and its list) above it
+  if (window.visualViewport) visualViewport.addEventListener('resize', () => { if (SP.open) el.style.height = visualViewport.height + 'px'; });
+  return el;
+}
+function spDraw() {
+  const q = $('#sq').value.trim(), body = $('#sbody');
+  SP.el.querySelector('.sp-x').hidden = !q;
+  if (!q) {
+    const r = recents(); SP.shown = new Set(); SP.items = [];
+    body.innerHTML = r.length ? `<div class="sp-h"><b>Recent Searches</b><button type="button" class="sp-clr">Clear</button></div>${r.map((x) => `<button type="button" class="srec" data-q="${esc(x)}">${ic('clock')}<span>${esc(x)}</span></button>`).join('')}` : `<div class="sp-empty">${ic('search')}<b>Search Pawlog</b><small>Events, notes, to-dos, daily logs, shots, supplies and photos.</small></div>`;
+    return;
+  }
+  SP.items = searchRun(q);
+  if (!SP.items.length) { SP.shown = new Set(); body.innerHTML = `<div class="sp-empty">${ic('search')}<b>No results for “${esc(q)}”</b><small>Try a name, a date or a note.</small></div>`; return; }
+  const seen = SP.shown, now = new Set(); let last = '', n = 0;
+  body.innerHTML = SP.items.map((it, k) => {
+    const head = it.group !== last ? `<div class="sgrp">${esc(it.group)}</div>` : ''; last = it.group;
+    const fresh = !seen.has(it.id); now.add(it.id);
+    return `${head}<button type="button" class="sit${fresh ? ' new' : ''}" style="--i:${fresh ? n++ : 0}" data-k="${k}"><span class="sico">${ic(it.icon)}</span><span class="stxt"><b>${hlq(it.title, q)}</b><small>${hlq(it.sub, q)}</small></span></button>`;
+  }).join('');
+  SP.shown = now;
+}
+const spClip = () => {
+  const b = $('#tabbar .sp').getBoundingClientRect(), W = innerWidth, H = SP.el.clientHeight;
+  return `inset(${b.top}px ${W - b.right}px ${Math.max(0, H - b.bottom)}px ${b.left}px round ${b.height / 2}px)`;
+};
+function spOpen() {
+  const el = spEl(), q = el.querySelector('#sq');
+  SP.open = true; el.style.height = ((window.visualViewport && visualViewport.height) || innerHeight) + 'px';
+  el.style.transition = 'none'; el.style.clipPath = spClip(); el.inert = false; el.classList.remove('full'); el.classList.add('on');
+  q.value = ''; SP.shown = new Set(); spDraw();
+  q.focus({ preventScroll: true }); // inside the tap, so the keyboard comes up straight away
+  void el.offsetWidth;
+  el.style.transition = ''; el.style.clipPath = 'inset(0px 0px 0px 0px round 0px)'; el.classList.add('full');
+}
+function spClose(keep) {
+  if (!SP.open) return;
+  SP.open = false; const el = SP.el;
+  el.querySelector('#sq').blur(); el.classList.remove('full'); el.style.clipPath = keep ? 'inset(0px 0px 0px 0px round 0px)' : spClip();
+  if (keep) { el.classList.remove('on'); el.inert = true; el.style.height = ''; return; }
+  setTimeout(() => { if (!SP.open) { el.classList.remove('on'); el.inert = true; el.style.height = ''; } }, 560);
 }
