@@ -1816,7 +1816,7 @@ function spEl() {
     else if (h) { addRecent(q.value); const it = SP.items[+h.dataset.k]; spClose(true); if (it) setTimeout(() => goHit(it), 260); }
   });
   // the keyboard shrinks the visual viewport on iOS: keep the page (and its list) above it
-  if (window.visualViewport) visualViewport.addEventListener('resize', () => { if (SP.open) el.style.height = visualViewport.height + 'px'; });
+  if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, () => { if (SP.open) spFit(); });
   return el;
 }
 function spDraw() {
@@ -1837,23 +1837,33 @@ function spDraw() {
   }).join('');
   SP.shown = now;
 }
-const spClip = () => {
-  const b = $('#tabbar .sp').getBoundingClientRect(), W = innerWidth, H = SP.el.clientHeight;
-  return `inset(${b.top}px ${W - b.right}px ${Math.max(0, H - b.bottom)}px ${b.left}px round ${b.height / 2}px)`;
+// the page always covers the whole screen, even when iOS pans the viewport for the keyboard; --kb keeps the list above the keyboard
+const spFit = () => { const v = window.visualViewport; if (!v) return; SP.el.style.top = v.offsetTop + 'px'; SP.el.style.height = (innerHeight - v.offsetTop) + 'px'; SP.el.style.setProperty('--kb', Math.max(0, innerHeight - v.height - v.offsetTop) + 'px'); };
+const spInert = (on) => [...document.body.children].forEach((c) => { if (c !== SP.el && c.tagName !== 'SCRIPT') c.inert = on; });
+const spPose = (f, p, r) => { // park the field exactly on rect p, ready to glide to r
+  f.style.transition = 'none'; f.style.flex = 'none'; f.style.width = p.width + 'px'; f.style.height = p.height + 'px';
+  f.style.transform = `translate(${p.left - r.left}px, ${p.top - r.top}px)`;
 };
+const spFree = (f) => { f.style.transition = f.style.flex = f.style.width = f.style.height = f.style.transform = ''; };
 function spOpen() {
-  const el = spEl(), q = el.querySelector('#sq');
-  SP.open = true; el.style.height = ((window.visualViewport && visualViewport.height) || innerHeight) + 'px';
-  el.style.transition = 'none'; el.style.clipPath = spClip(); el.inert = false; el.classList.remove('full'); el.classList.add('on');
+  const el = spEl(), q = el.querySelector('#sq'), f = el.querySelector('.sp-field'), p = $('#tabbar .sp').getBoundingClientRect();
+  SP.open = true; clearTimeout(SP.t); spFree(f); spFit(); spInert(true);
+  el.inert = false; el.classList.remove('full'); el.classList.add('on');
   q.value = ''; SP.shown = new Set(); spDraw();
+  const r = f.getBoundingClientRect();
+  document.body.classList.add('sp-open'); spPose(f, p, r);
   q.focus({ preventScroll: true }); // inside the tap, so the keyboard comes up straight away
   void el.offsetWidth;
-  el.style.transition = ''; el.style.clipPath = 'inset(0px 0px 0px 0px round 0px)'; el.classList.add('full');
+  f.style.transition = ''; f.style.width = r.width + 'px'; f.style.height = r.height + 'px'; f.style.transform = 'none'; el.classList.add('full');
+  SP.t = setTimeout(() => spFree(f), 700);
 }
 function spClose(keep) {
   if (!SP.open) return;
-  SP.open = false; const el = SP.el;
-  el.querySelector('#sq').blur(); el.classList.remove('full'); el.style.clipPath = keep ? 'inset(0px 0px 0px 0px round 0px)' : spClip();
-  if (keep) { el.classList.remove('on'); el.inert = true; el.style.height = ''; return; }
-  setTimeout(() => { if (!SP.open) { el.classList.remove('on'); el.inert = true; el.style.height = ''; } }, 560);
+  SP.open = false; clearTimeout(SP.t); spInert(false); const el = SP.el, f = el.querySelector('.sp-field'), done = () => { el.classList.remove('on'); el.inert = true; el.style.top = el.style.height = ''; document.body.classList.remove('sp-open'); spFree(f); };
+  el.querySelector('#sq').blur();
+  if (keep) { el.classList.remove('full'); SP.t = setTimeout(done, 380); return; }
+  const p = $('#tabbar .sp').getBoundingClientRect(), r = f.getBoundingClientRect();
+  f.style.transition = 'none'; f.style.flex = 'none'; f.style.width = r.width + 'px'; f.style.height = r.height + 'px'; f.style.transform = 'none'; void f.offsetWidth;
+  f.style.transition = ''; f.style.width = p.width + 'px'; f.style.height = p.height + 'px'; f.style.transform = `translate(${p.left - r.left}px, ${p.top - r.top}px)`;
+  el.classList.remove('full'); SP.t = setTimeout(done, 600);
 }
