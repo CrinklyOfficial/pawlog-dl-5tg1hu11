@@ -1060,6 +1060,7 @@ function render() {
   chip.hidden = !pr.name;
   { const u = me(), nm = u.username || 'Account'; $('#acct').innerHTML = `${u.avatar ? `<img class="ava" src="${esc(u.avatar)}" alt="">` : `<span class="ava ph ini" aria-hidden="true">${esc(nm.trim().charAt(0).toUpperCase() || '?')}</span>`}<span class="an">${esc(nm)}</span>`; }
   $('#greet').textContent = `${greeting()}, ${new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}`;
+  $('#htitle').textContent = 'Today'; $('#hgreet').textContent = $('#greet').textContent;
   const m = me();
   $('#who').innerHTML = `${m.avatar ? `<img class="ava" src="${esc(m.avatar)}" alt="">` : `<span class="ava ph">${dogArt('awake')}</span>`}<span class="lbl wname"><b>${esc(m.username || 'Account')}</b><small id="syncst"></small></span>`;
   const gear = $('#gear'); gear.innerHTML = ic('settings'); gear.classList.toggle('on', ui.page === 'settings');
@@ -1677,22 +1678,20 @@ boot().catch((err) => alert('Could not start Pawlog: ' + (err.message || err)));
 const Q = { open: false, sel: 0, items: [] };
 function searchIndex() {
   const out = [], add = (group, icon, title, sub, o, extra = '') => out.push({ group, icon, title: title || 'Untitled', sub, ...o, hay: `${title} ${sub} ${extra}`.toLowerCase() });
-  PAGES.forEach(([id, icon, label]) => add('Go to', icon, label, 'Open page', { nav: id }));
-  pets().forEach((x) => add('Pets', 'paw', x.name, x.breed || 'Pet profile', { act: 'pick-pet', id: x.id }, x.breed));
-  all('task').forEach((k) => add(k.todo ? 'To-dos' : 'Care tasks', k.todo ? 'list-check' : 'check-square', k.name, k.todo ? (k.done ? 'Done' : 'Due ' + fmtDate(k.due)) : 'Care task', { act: k.todo ? 'edit-todo' : 'edit-task', id: k.id }));
-  all('event').forEach((e) => add('Calendar', 'calendar', e.title, fmtDate(e.date) + (e.time ? ' · ' + fmtTime(e.time) : ''), { act: 'edit-event', id: e.id }, e.notes));
-  all('vetNote').forEach((n) => add(n.kind === 'note' ? 'Notes' : 'Health & Vet', n.kind === 'note' ? 'note' : 'plus-square', n.title || (n.kind === 'exam' ? 'Exam' : 'Note'), fmtDate(n.date), n.kind === 'note' ? { act: 'edit-pnote', id: n.id } : { nav: 'health' }, `${n.text || ''} ${n.vet || ''}`));
-  all('shot').forEach((s) => add('Health & Vet', 'shield', s.name + ' shot', s.next ? 'Next ' + fmtDate(s.next) : 'Vaccine', { act: 'edit-shot', id: s.id }, s.about));
-  all('log').forEach((l) => { const t = typeInfo(l.type); add('Daily log', t.icon || 'notebook', t.name, `${fmtDate(dayOf(l.ts))} · ${fmtTs(l.ts)}${l.note ? ' · ' + l.note : ''}`, { nav: 'log', day: dayOf(l.ts) }, `${l.note || ''} ${l.level || ''}`); });
-  all('training').forEach((t) => add('Training', 'graduation', t.name, 'Training plan', { act: 'edit-training', id: t.id }, t.notes));
-  all('supply').forEach((s) => add('Supplies', 'cart', s.name, s.bought ? 'Got it' : 'To get', { nav: 'supplies' }, s.notes));
-  all('photo').forEach((x) => add('Memories', 'image', x.title || 'Photo', fmtDate(x.date), { act: 'view-photo', id: x.id }, x.note));
+  all('task').forEach((k) => add(k.todo ? 'To-dos' : 'Care tasks', k.todo ? 'list-check' : 'check-square', k.name, k.todo ? (k.done ? 'Done' : 'Due ' + fmtDate(k.due)) : 'Care task', { page: k.todo ? 'todo' : 'care', id: k.id }));
+  all('event').forEach((e) => add('Calendar', 'calendar', e.title, fmtDate(e.date) + (e.time ? ' · ' + fmtTime(e.time) : ''), { page: 'calendar', id: e.id, date: e.date }, e.notes));
+  all('vetNote').forEach((n) => add(n.kind === 'note' ? 'Notes' : 'Health & Vet', n.kind === 'note' ? 'note' : 'plus-square', n.title || (n.kind === 'exam' ? 'Exam' : 'Note'), fmtDate(n.date), { page: n.kind === 'note' ? 'notes' : 'health', id: n.id }, `${n.text || ''} ${n.vet || ''}`));
+  all('shot').forEach((s) => add('Health & Vet', 'shield', s.name + ' shot', s.next ? 'Next ' + fmtDate(s.next) : 'Vaccine', { page: 'health', id: s.id }, s.about));
+  all('log').forEach((l) => { const t = typeInfo(l.type); add('Daily log', t.icon || 'notebook', t.name, `${fmtDate(dayOf(l.ts))} · ${fmtTs(l.ts)}${l.note ? ' · ' + l.note : ''}`, { page: 'log', id: l.id, day: dayOf(l.ts) }, `${l.note || ''} ${l.level || ''}`); });
+  all('training').forEach((t) => add('Training', 'graduation', t.name, 'Training plan', { page: 'training', id: t.id }, t.notes));
+  all('supply').forEach((s) => add('Supplies', 'cart', s.name, s.bought ? 'Got it' : 'To get', { page: 'supplies', id: s.id }, s.notes));
+  all('photo').forEach((x) => add('Memories', 'image', x.title || 'Photo', fmtDate(x.date), { page: 'gallery', id: x.id }, x.note));
   return out;
 }
 function searchRun(q) {
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words.length) { const pg = searchIndex().filter((i) => i.group === 'Go to'); return pg; }
-  return searchIndex().map((i) => ({ i, sc: words.every((w) => i.hay.includes(w)) ? words.reduce((n, w) => n + (i.title.toLowerCase().startsWith(w) ? 3 : i.title.toLowerCase().includes(w) ? 2 : 1), 0) + (i.group === 'Go to' ? 2 : 0) : 0 })).filter((x) => x.sc).sort((a, b) => b.sc - a.sc).slice(0, 24).map((x) => x.i);
+  if (!words.length) return [];
+  return searchIndex().map((i) => ({ i, sc: words.every((w) => i.hay.includes(w)) ? words.reduce((n, w) => n + (i.title.toLowerCase().startsWith(w) ? 3 : i.title.toLowerCase().includes(w) ? 2 : 1), 0) : 0 })).filter((x) => x.sc).sort((a, b) => b.sc - a.sc).slice(0, 24).map((x) => x.i);
 }
 function searchDraw() {
   const box = $('#sres'), q = $('#q').value.trim();
@@ -1701,9 +1700,9 @@ function searchDraw() {
   const hl = (t) => { const e = esc(t); const ws = q.split(/\s+/).filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); return ws.length ? e.replace(new RegExp('(' + ws.join('|') + ')', 'ig'), '<mark>$1</mark>') : e; };
   let last = '', n = 0;
   box.innerHTML = Q.items.length ? Q.items.map((it, k) => {
-    const head = it.group !== last ? `<div class="sgrp">${esc(it.group === 'Go to' && q ? 'Pages' : it.group === 'Go to' ? 'Jump to' : it.group)}</div>` : ''; last = it.group;
-    return `${head}<button type="button" class="sit${k === Q.sel ? ' on' : ''}" style="--i:${n++}" data-k="${k}"${it.act ? ` data-act="${it.act}" data-id="${esc(it.id)}"` : ` data-nav="${it.nav}"`}><span class="sico">${ic(it.icon)}</span><span class="stxt"><b>${hl(it.title)}</b><small>${hl(it.sub)}</small></span><span class="sret">↵</span></button>`;
-  }).join('') : `<div class="sempty">${ic('search')}<b>No results for “${esc(q)}”</b><small>Try a name, a date or a note.</small></div>`;
+    const head = it.group !== last ? `<div class="sgrp">${esc(it.group)}</div>` : ''; last = it.group;
+    return `${head}<button type="button" class="sit${k === Q.sel ? ' on' : ''}" style="--i:${n++}" data-k="${k}"><span class="sico">${ic(it.icon)}</span><span class="stxt"><b>${hl(it.title)}</b><small>${hl(it.sub)}</small></span><span class="sret">↵</span></button>`;
+  }).join('') : (q ? `<div class="sempty">${ic('search')}<b>No results for “${esc(q)}”</b><small>Try a name, a date or a note.</small></div>` : `<div class="sempty hint">${ic('search')}<b>Search anything</b><small>Events, notes, to-dos, daily logs, shots, supplies and photos.</small></div>`);
   box.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
 }
 function searchOpen(on) {
@@ -1715,11 +1714,19 @@ function searchOpen(on) {
 }
 function searchGo(k) {
   const it = Q.items[k]; if (!it) return;
-  if (it.day) ui.logDay = it.day;
-  if (it.act === 'pick-pet') { ui.petId = it.id; ui.page = 'dashboard'; render(); playEnter(); }
-  else if (it.nav) { ui.page = it.nav; closeModal(); render(); playEnter(); }
-  else { const b = document.createElement('button'); b.dataset.act = it.act; b.dataset.id = it.id; b.hidden = true; document.body.appendChild(b); b.click(); b.remove(); }
   $('#q').value = ''; searchOpen(false);
+  ui.page = it.page;
+  if (it.day) ui.logDay = it.day;
+  if (it.date) { const d = parseYmd(it.date); ui.calMonth = new Date(d.getFullYear(), d.getMonth(), 1); ui.selDay = it.date; }
+  closeModal(); render(); playEnter();
+  setTimeout(() => searchFlash(it), 220);
+}
+// Scroll to the thing that was searched for and make it glow (works for any page that renders the record's id).
+function searchFlash(it) {
+  const hits = [...$('#view').querySelectorAll(`[data-id="${it.id}"]`)].map((el) => el.closest('.todo, .entry, .note, .care-item, .tile-ph, .supply, .ev, .srow, .card') || el).slice(0, 3);
+  if (it.date) { const d = $('#view').querySelector(`.day[data-id="${it.date}"]`); if (d) hits.unshift(d); }
+  hits.forEach((el) => { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); setTimeout(() => el.classList.remove('hit'), 2500); });
+  hits[0]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 {
   const q = $('#q');
