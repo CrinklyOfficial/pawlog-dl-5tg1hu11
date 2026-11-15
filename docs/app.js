@@ -1693,24 +1693,34 @@ function searchRun(q) {
   if (!words.length) return [];
   return searchIndex().map((i) => ({ i, sc: words.every((w) => i.hay.includes(w)) ? words.reduce((n, w) => n + (i.title.toLowerCase().startsWith(w) ? 3 : i.title.toLowerCase().includes(w) ? 2 : 1), 0) : 0 })).filter((x) => x.sc).sort((a, b) => b.sc - a.sc).slice(0, 24).map((x) => x.i);
 }
+// The results panel only exists while there is something to show. Rows already on screen stay put; new ones rise in one after another,
+// and the panel grows or shrinks to fit, so typing feels like the results are being pulled up.
 function searchDraw() {
   const box = $('#sres'), q = $('#q').value.trim();
   Q.items = searchRun(q);
   Q.sel = Math.min(Q.sel, Math.max(0, Q.items.length - 1));
+  const had = box.classList.contains('has'), h0 = had ? box.offsetHeight : 0;
+  if (!Q.items.length) { box.classList.remove('has'); Q.shown = new Set(); return; }
   const hl = (t) => { const e = esc(t); const ws = q.split(/\s+/).filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); return ws.length ? e.replace(new RegExp('(' + ws.join('|') + ')', 'ig'), '<mark>$1</mark>') : e; };
+  const seen = had ? Q.shown : new Set(), now = new Set();
   let last = '', n = 0;
-  box.innerHTML = Q.items.length ? Q.items.map((it, k) => {
+  box.innerHTML = Q.items.map((it, k) => {
     const head = it.group !== last ? `<div class="sgrp">${esc(it.group)}</div>` : ''; last = it.group;
-    return `${head}<button type="button" class="sit${k === Q.sel ? ' on' : ''}" style="--i:${n++}" data-k="${k}"><span class="sico">${ic(it.icon)}</span><span class="stxt"><b>${hl(it.title)}</b><small>${hl(it.sub)}</small></span><span class="sret">↵</span></button>`;
-  }).join('') : (q ? `<div class="sempty">${ic('search')}<b>No results for “${esc(q)}”</b><small>Try a name, a date or a note.</small></div>` : `<div class="sempty hint">${ic('search')}<b>Search anything</b><small>Events, notes, to-dos, daily logs, shots, supplies and photos.</small></div>`);
+    const fresh = !seen.has(it.id); now.add(it.id);
+    return `${head}<button type="button" class="sit${k === Q.sel ? ' on' : ''}${fresh ? ' new' : ''}" style="--i:${fresh ? n++ : 0}" data-k="${k}"><span class="sico">${ic(it.icon)}</span><span class="stxt"><b>${hl(it.title)}</b><small>${hl(it.sub)}</small></span><span class="sret">↵</span></button>`;
+  }).join('');
+  Q.shown = now;
+  box.classList.add('has');
+  const max = parseFloat(getComputedStyle(box).maxHeight) || 540;
+  box.style.height = 'auto'; const h1 = Math.min(box.scrollHeight, max);
+  if (had) { box.style.height = h0 + 'px'; void box.offsetHeight; box.style.height = h1 + 'px'; } else box.style.height = h1 + 'px';
   box.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
 }
 function searchOpen(on) {
   if (on === Q.open) return;
   Q.open = on;
   $('#search').classList.toggle('open', on);
-  document.body.classList.toggle('searching', on);
-  if (on) { Q.sel = 0; $('#sres').classList.add('fresh'); searchDraw(); } else { $('#q').blur(); }
+  if (on) { Q.sel = 0; searchDraw(); } else { $('#sres').classList.remove('has'); Q.shown = new Set(); $('#q').blur(); }
 }
 function searchGo(k) {
   const it = Q.items[k]; if (!it) return;
@@ -1732,7 +1742,7 @@ function searchFlash(it) {
   const q = $('#q');
   if (q) {
     q.addEventListener('focus', () => searchOpen(true));
-    q.addEventListener('input', () => { Q.sel = 0; $('#sres').classList.remove('fresh'); searchDraw(); });
+    q.addEventListener('input', () => { Q.sel = 0; searchDraw(); });
     $('#sres').addEventListener('mousemove', (e) => { const b = e.target.closest('.sit'); if (b && +b.dataset.k !== Q.sel) { Q.sel = +b.dataset.k; $('#sres').querySelector('.on')?.classList.remove('on'); b.classList.add('on'); } });
     $('#sres').addEventListener('mousedown', (e) => { const b = e.target.closest('.sit'); if (b) { e.preventDefault(); searchGo(+b.dataset.k); } });
     q.addEventListener('keydown', (e) => {
