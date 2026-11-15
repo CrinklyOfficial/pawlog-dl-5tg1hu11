@@ -951,3 +951,130 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   nav.tabbar .pill button { will-change: scale; }
   main { -webkit-overflow-scrolling: touch; }
 }
+
+/* ============ Desktop: dark, Apple Music / Podcasts style with Liquid Glass touches ============
+   Floating glass sidebar, solid near-black content panel, flat hairline cards, glass only on floating
+   chrome (sidebar, menus, sheets, toast). One purple accent. Phone (<=700px) keeps its own theme. */
+@media (min-width: 701px) {
+  :root {
+    color-scheme: dark;
+    --bg: #131316; --group: rgba(255,255,255,.055); --fill: rgba(255,255,255,.07); --fill2: rgba(255,255,255,.12); --sep: rgba(255,255,255,.09);
+    --text: #f5f5f7; --text2: rgba(235,235,245,.66); --text3: rgba(235,235,245,.42);
+    --accent: #b3a5ff; --accent-fill: #7b5cff; --accent-bg: rgba(179,165,255,.16);
+    --ok: #4be08a; --warn: #ffbf5a; --bad: #ff8077;
+    --glass: rgba(40,40,48,.58); --hair: rgba(255,255,255,.1); --hair-top: rgba(255,255,255,.2);
+    --ink: #1c1c1e; --cream: #f2e3c6;
+  }
+  html, body { background: #08080b; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  h1, h2, h3 { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; }
+  body::before { content: ""; position: fixed; inset: 0; z-index: -1; background:
+    radial-gradient(55% 60% at 8% 0%, rgba(110,80,255,.34), transparent 70%),
+    radial-gradient(45% 50% at 100% 100%, rgba(70,120,255,.18), transparent 70%),
+    radial-gradient(40% 40% at 0% 100%, rgba(255,80,150,.10), transparent 70%), #08080b; }
+  html, body { background: transparent; }
+  html { background: #08080b; }
+
+  h1 { font-size: 32px; letter-spacing: -.022em; }
+  h2 { font-size: 17px; letter-spacing: -.01em; }
+
+  div.app { padding: 10px; column-gap: 10px; }
+  /* sidebar: the one big glass surface */
+  .side { background: var(--glass); border-radius: 22px; padding: 16px 10px 10px;
+    -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
+    box-shadow: inset 0 1px 0 var(--hair-top), inset 0 0 0 1px var(--hair), 0 16px 48px rgba(0,0,0,.4); }
+  .brandbtn { color: var(--text); }
+  .brandbtn:hover, .brandbtn[aria-expanded=true] { background: rgba(255,255,255,.08); }
+  .bname b { font-size: 17px; font-weight: 700; }
+  nav button { color: var(--text); font-size: 14.5px; font-weight: 500; padding: 7px 10px; border-radius: 10px; }
+  nav button .ic { color: var(--accent); }
+  nav button:hover:not(.on) { background: rgba(255,255,255,.06); }
+  nav button.on { background: rgba(255,255,255,.13); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); font-weight: 600; }
+  nav button.on .ic { color: var(--accent); }
+  .navlbl { font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--text3); padding: 18px 10px 5px; }
+  .side-foot { border-top-color: var(--sep); }
+  .who:hover { background: rgba(255,255,255,.07); }
+  .collapse:hover { background: rgba(255,255,255,.1); }
+  .collapse.on { background: rgba(255,255,255,.12); }
+
+  /* content panel: flat and quiet */
+  main { background: var(--bg); background-image: none; border-radius: 22px; padding: 34px 36px 48px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 10px 40px rgba(0,0,0,.35); }
+  .top { margin-bottom: 28px; }
+  .top p { color: var(--text2); }
+
+  /* cards: hairline, no heavy shadow */
+  .card, .group { background: var(--group); border-radius: 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
+  .card { padding: 18px 20px; }
+  .type, .note { background: var(--fill); }
+  .type:hover, .note:hover { background: var(--fill2); box-shadow: none; }
+  .note { border-top-color: var(--accent-fill); }
+  .petchip { background: var(--group); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+  .photo { box-shadow: 0 0 0 3px var(--bg), 0 0 0 4.5px rgba(179,165,255,.4); }
+  .tile { background: var(--fill); }
+
+  /* controls */
+  .btn { background: var(--fill2); color: var(--text); }
+  .btn:hover { background: rgba(255,255,255,.18); }
+  .btn.ghost { background: transparent; color: var(--accent); }
+  .btn.ghost:hover { background: var(--accent-bg); }
+  .btn.primary { background: linear-gradient(180deg, #8d72ff, #7050f0); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 2px 10px rgba(123,92,255,.35); }
+  .btn.primary:hover { background: linear-gradient(180deg, #9a82ff, #7b5cff); }
+  .btn.danger { background: rgba(255,128,119,.16); color: var(--bad); }
+  .btn.danger:hover { background: rgba(255,128,119,.26); }
+  .qbtn { background: var(--fill2); color: var(--text2); } .qbtn:hover { background: rgba(255,255,255,.18); color: var(--text); }
+  .link { color: var(--accent); }
+  input, select, textarea { background: rgba(255,255,255,.07); color: var(--text); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+  input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--accent-fill), 0 0 0 4px rgba(123,92,255,.28); }
+  select option { background: #232328; color: var(--text); }
+  :focus-visible { outline: 2px solid rgba(179,165,255,.7); }
+  .seg { background: rgba(255,255,255,.08); }
+  .seg button.on { background: rgba(255,255,255,.18); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.14); }
+  .pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); }
+  .chip { background: var(--fill); } .chip:hover { background: var(--fill2); }
+
+  /* checkmarks, rings, stars */
+  .todo .tick, .care-item input { box-shadow: inset 0 0 0 1.6px rgba(255,255,255,.3); }
+  .todo .tick:hover, .care-item input:hover { box-shadow: inset 0 0 0 1.6px var(--accent); }
+  .todo .tick:checked, .care-item input:checked { box-shadow: none; }
+  .rt { stroke: rgba(255,255,255,.1); }
+  .stars button { color: rgba(255,255,255,.2); } .stars-view .off { color: rgba(255,255,255,.2); }
+  .todo.p-high { --pc: #ff8077; } .todo.p-med { --pc: #ffbf5a; } .todo.p-low { --pc: #64d2ff; }
+  .prio.high, .pr.high input:checked + span { color: #ff8077; } .prio.med, .pr.med input:checked + span { color: #ffbf5a; } .prio.low, .pr.low input:checked + span { color: #64d2ff; }
+  .pr.high input:checked + span { box-shadow: inset 0 0 0 1.5px #ff8077; } .pr.med input:checked + span { box-shadow: inset 0 0 0 1.5px #ffbf5a; } .pr.low input:checked + span { box-shadow: inset 0 0 0 1.5px #64d2ff; }
+  .pr span { background: var(--fill2); }
+  .art .soft { fill: rgba(255,255,255,.08); } .art .softs { stroke: rgba(255,255,255,.2); }
+  .art .hl { fill: #fff; }
+
+  /* dashboard hero bubble, calendar */
+  .bubble { background: rgba(255,255,255,.12); color: var(--text); box-shadow: inset 0 1px 0 var(--hair-top), inset 0 0 0 1px var(--hair); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+  .bubble::after { background: rgba(255,255,255,.12); }
+  .bubble:hover, .bubble:hover::after { background: rgba(255,255,255,.18); }
+  .day:hover { background: rgba(255,255,255,.07); }
+  .day.sel { background: var(--accent-bg); }
+  .dow, .day { background: #17171b; }
+  .rpt { background: #1c1c1e; } .viewimg { background: #000; }
+
+  /* floating glass: menus, sheets, update bar, toast */
+  .menu, .sheet, .updbar { background: var(--glass); color: var(--text);
+    -webkit-backdrop-filter: blur(44px) saturate(180%); backdrop-filter: blur(44px) saturate(180%);
+    box-shadow: inset 0 1px 0 var(--hair-top), inset 0 0 0 1px var(--hair), 0 24px 70px rgba(0,0,0,.55); }
+  .sheet { background: rgba(32,32,38,.78); border-radius: 22px; }
+  .mi { color: var(--text); } .mi .ic { color: var(--accent); }
+  .mi:hover, .mi:hover .ic { background: var(--accent-fill); color: #fff; }
+  .menu hr { border-top-color: var(--sep); }
+  .overlay { background: rgba(0,0,0,.5); }
+  .updbar button { background: var(--accent-fill); }
+  .gate { background: radial-gradient(60% 60% at 15% 0%, rgba(110,80,255,.34), transparent 70%), #08080b; }
+  .gbtn { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); color: var(--text); }
+
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.22); }
+  ::selection { background: rgba(123,92,255,.5); }
+}
+@media (min-width: 701px) and (prefers-reduced-transparency: reduce) {
+  .side, .menu, .sheet, .updbar, .bubble { -webkit-backdrop-filter: none; backdrop-filter: none; background: #25252b; }
+}
+@media (min-width: 701px) and (prefers-contrast: more) {
+  :root { --text2: rgba(255,255,255,.85); --hair: rgba(255,255,255,.4); }
+  .card, .group { box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
+}
