@@ -146,6 +146,8 @@ const ICON = {
   'chev-left': '<path d="M15 18l-6-6 6-6"/>',
   'chev-right': '<path d="M9 18l6-6-6-6"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  pencil: '<path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14 7 3 3"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   scale: '<path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -616,12 +618,11 @@ function dashView() {
   return `
   ${phoneHero(p, heroData)}
   <div class="hlist">
-  ${hb('today', todayCard, ord)}
   <div class="card hero">
     <div class="hero-main">
       ${avatar(p, 'photo', 'data-act="edit-profile" title="Change photo"')}
       <div class="hero-info">
-        <div class="row"><h2>${esc(p.name)}</h2><button class="link" data-act="edit-profile">Edit</button></div>
+        <div class="row"><h2>${esc(p.name)}</h2><button class="iconbtn" data-act="edit-profile" aria-label="Edit profile" title="Edit profile">${ic('pencil')}</button></div>
         <div class="muted">${esc(p.breed)}</div>
         <div class="facts">
           ${fact('Age', ageText(p.dob))}${fact('Birthday', fmtDate(p.dob))}${fact('Weight', w ? w.lb + ' lb' : 'Log weight', 'new-weight')}${fact('Next vet visit', appt ? fmtDate(appt.date) : 'Not set')}
@@ -636,6 +637,7 @@ function dashView() {
     <div class="type-grid">${allTypes().map(typeBtn).join('')}</div>
   </div>`, ord)}
 
+  ${hb('today', todayCard, ord)}
   <div class="cards three">
     ${hb('care', `<div class="card">
       <div class="row between"><h2>Today's care</h2><span class="muted small">${doneN} of ${dueTasks.length}</span></div>
@@ -1670,3 +1672,71 @@ function maybeOnboard(force, onDone, onSeen) {
 }
 
 boot().catch((err) => alert('Could not start Pawlog: ' + (err.message || err)));
+
+/* ---------- Search: one box for everything (desktop header) ---------- */
+const Q = { open: false, sel: 0, items: [] };
+function searchIndex() {
+  const out = [], add = (group, icon, title, sub, o, extra = '') => out.push({ group, icon, title: title || 'Untitled', sub, ...o, hay: `${title} ${sub} ${extra}`.toLowerCase() });
+  PAGES.forEach(([id, icon, label]) => add('Go to', icon, label, 'Open page', { nav: id }));
+  pets().forEach((x) => add('Pets', 'paw', x.name, x.breed || 'Pet profile', { act: 'pick-pet', id: x.id }, x.breed));
+  all('task').forEach((k) => add(k.todo ? 'To-dos' : 'Care tasks', k.todo ? 'list-check' : 'check-square', k.name, k.todo ? (k.done ? 'Done' : 'Due ' + fmtDate(k.due)) : 'Care task', { act: k.todo ? 'edit-todo' : 'edit-task', id: k.id }));
+  all('event').forEach((e) => add('Calendar', 'calendar', e.title, fmtDate(e.date) + (e.time ? ' · ' + fmtTime(e.time) : ''), { act: 'edit-event', id: e.id }, e.notes));
+  all('vetNote').forEach((n) => add(n.kind === 'note' ? 'Notes' : 'Health & Vet', n.kind === 'note' ? 'note' : 'plus-square', n.title || (n.kind === 'exam' ? 'Exam' : 'Note'), fmtDate(n.date), n.kind === 'note' ? { act: 'edit-pnote', id: n.id } : { nav: 'health' }, `${n.text || ''} ${n.vet || ''}`));
+  all('shot').forEach((s) => add('Health & Vet', 'shield', s.name + ' shot', s.next ? 'Next ' + fmtDate(s.next) : 'Vaccine', { act: 'edit-shot', id: s.id }, s.about));
+  all('log').forEach((l) => { const t = typeInfo(l.type); add('Daily log', t.icon || 'notebook', t.name, `${fmtDate(dayOf(l.ts))} · ${fmtTs(l.ts)}${l.note ? ' · ' + l.note : ''}`, { nav: 'log', day: dayOf(l.ts) }, `${l.note || ''} ${l.level || ''}`); });
+  all('training').forEach((t) => add('Training', 'graduation', t.name, 'Training plan', { act: 'edit-training', id: t.id }, t.notes));
+  all('supply').forEach((s) => add('Supplies', 'cart', s.name, s.bought ? 'Got it' : 'To get', { nav: 'supplies' }, s.notes));
+  all('photo').forEach((x) => add('Memories', 'image', x.title || 'Photo', fmtDate(x.date), { act: 'view-photo', id: x.id }, x.note));
+  return out;
+}
+function searchRun(q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) { const pg = searchIndex().filter((i) => i.group === 'Go to'); return pg; }
+  return searchIndex().map((i) => ({ i, sc: words.every((w) => i.hay.includes(w)) ? words.reduce((n, w) => n + (i.title.toLowerCase().startsWith(w) ? 3 : i.title.toLowerCase().includes(w) ? 2 : 1), 0) + (i.group === 'Go to' ? 2 : 0) : 0 })).filter((x) => x.sc).sort((a, b) => b.sc - a.sc).slice(0, 24).map((x) => x.i);
+}
+function searchDraw() {
+  const box = $('#sres'), q = $('#q').value.trim();
+  Q.items = searchRun(q);
+  Q.sel = Math.min(Q.sel, Math.max(0, Q.items.length - 1));
+  const hl = (t) => { const e = esc(t); const ws = q.split(/\s+/).filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); return ws.length ? e.replace(new RegExp('(' + ws.join('|') + ')', 'ig'), '<mark>$1</mark>') : e; };
+  let last = '', n = 0;
+  box.innerHTML = Q.items.length ? Q.items.map((it, k) => {
+    const head = it.group !== last ? `<div class="sgrp">${esc(it.group === 'Go to' && q ? 'Pages' : it.group === 'Go to' ? 'Jump to' : it.group)}</div>` : ''; last = it.group;
+    return `${head}<button type="button" class="sit${k === Q.sel ? ' on' : ''}" style="--i:${n++}" data-k="${k}"${it.act ? ` data-act="${it.act}" data-id="${esc(it.id)}"` : ` data-nav="${it.nav}"`}><span class="sico">${ic(it.icon)}</span><span class="stxt"><b>${hl(it.title)}</b><small>${hl(it.sub)}</small></span><span class="sret">↵</span></button>`;
+  }).join('') : `<div class="sempty">${ic('search')}<b>No results for “${esc(q)}”</b><small>Try a name, a date or a note.</small></div>`;
+  box.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
+}
+function searchOpen(on) {
+  if (on === Q.open) return;
+  Q.open = on;
+  $('#search').classList.toggle('open', on);
+  document.body.classList.toggle('searching', on);
+  if (on) { Q.sel = 0; $('#sres').classList.add('fresh'); searchDraw(); } else { $('#q').blur(); }
+}
+function searchGo(k) {
+  const it = Q.items[k]; if (!it) return;
+  if (it.day) ui.logDay = it.day;
+  if (it.act === 'pick-pet') { ui.petId = it.id; ui.page = 'dashboard'; render(); playEnter(); }
+  else if (it.nav) { ui.page = it.nav; closeModal(); render(); playEnter(); }
+  else { const b = document.createElement('button'); b.dataset.act = it.act; b.dataset.id = it.id; b.hidden = true; document.body.appendChild(b); b.click(); b.remove(); }
+  $('#q').value = ''; searchOpen(false);
+}
+{
+  const q = $('#q');
+  if (q) {
+    q.addEventListener('focus', () => searchOpen(true));
+    q.addEventListener('input', () => { Q.sel = 0; $('#sres').classList.remove('fresh'); searchDraw(); });
+    $('#sres').addEventListener('mousemove', (e) => { const b = e.target.closest('.sit'); if (b && +b.dataset.k !== Q.sel) { Q.sel = +b.dataset.k; $('#sres').querySelector('.on')?.classList.remove('on'); b.classList.add('on'); } });
+    $('#sres').addEventListener('mousedown', (e) => { const b = e.target.closest('.sit'); if (b) { e.preventDefault(); searchGo(+b.dataset.k); } });
+    q.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { q.value = ''; searchOpen(false); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); Q.sel = (Q.sel + (e.key === 'ArrowDown' ? 1 : -1) + Q.items.length) % (Q.items.length || 1); searchDraw(); }
+      else if (e.key === 'Enter') { e.preventDefault(); searchGo(Q.sel); }
+    });
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); q.focus(); q.select(); }
+      else if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) && !$('#modal').hidden === false) { e.preventDefault(); q.focus(); }
+    });
+    document.addEventListener('mousedown', (e) => { if (Q.open && !e.target.closest('#search')) { q.value = ''; searchOpen(false); } });
+  }
+}
