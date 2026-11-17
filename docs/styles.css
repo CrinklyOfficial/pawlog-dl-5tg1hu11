@@ -96,7 +96,7 @@ main > * { max-width: 1240px; margin-left: auto; margin-right: auto; }
 .cards > .wide { grid-column: 1 / -1; }
 .cards.three { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
 @media (max-width: 1100px) { .cards.three { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cards.three > :last-child { grid-column: 1 / -1; } }
-@media (max-width: 860px) { .cards, .cards.three { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 759px) { .cards, .cards.three { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- Grouped surfaces ---------- */
 .card, .group { background: var(--group); border-radius: var(--r); box-shadow: 0 0 0 .5px rgba(45, 35, 90, .048); }
@@ -470,7 +470,7 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 .tabbar { display: none; }
 
 /* ---------- phone layout (home-screen web app): 5-tab bar, compact top bar, More sheet ---------- */
-@media (max-width: 700px) {
+@media (max-width:599px) {
   html, body { height: 100%; }
   div.app { display: flex; flex-direction: column; height: 100dvh; padding: 0; gap: 0; }
   .side { display: none; }
@@ -533,10 +533,10 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 @keyframes onbping { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(1.5); opacity: 0; } }
 @keyframes onbdash { to { stroke-dashoffset: -22; } }
 @keyframes onbring { from { stroke-dasharray: 0 252; } }
-@media (max-width: 700px) { .onb { padding: calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 12px); } .onb-card { padding: 44px 18px 16px; } }
+@media (max-width:599px) { .onb { padding: calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 12px); } .onb-card { padding: 44px 18px 16px; } }
 
 /* Desktop: pin the app to the window so the bottom never gets cut off (Windows fullscreen / display scaling) */
-@media (min-width: 701px) {
+@media (min-width:600px) {
   html, body { height: 100%; overflow: hidden; }
   div.app { position: fixed; inset: 0; height: auto; grid-template-rows: minmax(0, 1fr); }
   main { padding-bottom: 48px; }
@@ -553,7 +553,7 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 /* ============ Phone: dark Liquid Glass ============
    One system: 8pt spacing (4/8/12/16/24/32), 16px page gutters, three radii (inner 16, card 24, pill),
    two glass levels, one accent. Text >= 4.5:1 on every surface. */
-@media (max-width: 700px) {
+@media (max-width:599px) {
   :root {
     color-scheme: dark;
     --sp1: 4px; --sp2: 8px; --sp3: 12px; --sp4: 16px; --sp5: 24px; --sp6: 32px;
@@ -756,7 +756,7 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   #toast { bottom: calc(max(var(--sp3), env(safe-area-inset-bottom) - 12px) + 68px + var(--sp3)); }
 }
 @keyframes sheetup { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (max-width: 700px) {
+@media (max-width:599px) {
   /* Calendar header: month nav on one line, actions on the next */
   .calhead { flex-direction: column; align-items: stretch; gap: var(--sp3); }
   .calhead .row { flex-wrap: nowrap; gap: var(--sp2); }
@@ -769,7 +769,7 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 .acct { display: none; }
 @keyframes sheetdown { to { transform: translateY(105%); } }
 @keyframes fadein { from { opacity: 0; } }
-@media (max-width: 700px) {
+@media (max-width:599px) {
   :root {
     --group: #1c1c1e; --glass: #1c1c1e; --hair: transparent; --hair-top: transparent;
     --fill: rgba(120,120,128,.24); --fill2: rgba(120,120,128,.36); --sep: rgba(84,84,88,.5);
@@ -850,24 +850,24 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 }
 
 /* ---- accessibility: respect the system settings ---- */
-@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
+@media (max-width:599px) and (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .2s !important; transition-duration: .15s !important; scroll-behavior: auto !important; }
   .sheet { animation: fadein .2s ease both !important; }
   nav.tabbar .pill.press, nav.tabbar .pill.drag .lens { transform: none; scale: 1; }
   button:active, .type:active { transform: none; }
 }
-@media (max-width: 700px) and (prefers-reduced-transparency: reduce) {
+@media (max-width:599px) and (prefers-reduced-transparency: reduce) {
   .top, nav.tabbar .pill, .sheet, nav.tabbar .lens { -webkit-backdrop-filter: none; backdrop-filter: none; }
   .top { background: #000; } nav.tabbar .pill { background: #2c2c2e; } nav.tabbar .lens { background: #48484a; }
 }
-@media (max-width: 700px) and (prefers-contrast: more) {
+@media (max-width:599px) and (prefers-contrast: more) {
   :root { --text2: rgba(255,255,255,.88); --text3: rgba(255,255,255,.7); --sep: rgba(255,255,255,.4); }
   .card, .group, .type, .mgrid button, .mprofile, .btn:not(.primary) { box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
   nav.tabbar .pill { background: #1c1c1e; box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); }
 }
 
 /* ---- tab bar refinement: spring-driven lens (JS), edge-lit glass, calm icon motion ---- */
-@media (max-width: 700px) {
+@media (max-width:599px) {
   nav.tabbar .pill { box-shadow: 0 6px 24px rgba(0,0,0,.26); transition: none; }
   nav.tabbar .pill.press { transform: none; }
   /* light catching the rim: bright on top, faint at the sides, a little back at the bottom */
@@ -888,18 +888,18 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   nav.tabbar button:focus-visible { outline: 2px solid rgba(255,255,255,.75); outline-offset: -3px; }
   @keyframes tabpop { 0% { transform: scale(.9); } 55% { transform: scale(1.06); } 100% { transform: none; } }
 }
-@media (max-width: 700px) and (hover: hover) { nav.tabbar button:not(.on):hover { color: rgba(255,255,255,.92); } }
-@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
+@media (max-width:599px) and (hover: hover) { nav.tabbar button:not(.on):hover { color: rgba(255,255,255,.92); } }
+@media (max-width:599px) and (prefers-reduced-motion: reduce) {
   nav.tabbar .pill:not(.drag) button.on .ic, nav.tabbar button:active .ic { animation: none !important; transform: none; }
   nav.tabbar .pill.drag .lens { scale: 1; }
 }
-@media (max-width: 700px) and (prefers-reduced-transparency: reduce) { nav.tabbar .pill::after { display: none; } nav.tabbar .lens { background: #48484a; } }
-@media (max-width: 700px) and (prefers-contrast: more) { nav.tabbar button { color: #fff; } nav.tabbar .lens { background: rgba(255,255,255,.3); } }
+@media (max-width:599px) and (prefers-reduced-transparency: reduce) { nav.tabbar .pill::after { display: none; } nav.tabbar .lens { background: #48484a; } }
+@media (max-width:599px) and (prefers-contrast: more) { nav.tabbar button { color: #fff; } nav.tabbar .lens { background: rgba(255,255,255,.3); } }
 
 /* ---- tab bar: sized and shaped from a screen recording of the iOS 26 App Store bar ----
    57pt tall, 20pt side/bottom margins, 10pt labels. Resting lens = darker pill; held or just-moved
    ("lift") = bigger clear-glass bubble with coloured rim fringes, bar swells 3.5%, tab inside magnified. */
-@media (max-width: 700px) {
+@media (max-width:599px) {
   /* overflow: the sidebar's `nav { overflow-y: auto }` would clip the swollen bar and lens to the wrapper */
   nav.tabbar { left: 20px; right: 20px; bottom: max(10px, calc(env(safe-area-inset-bottom) - 14px)); overflow: visible; }
   /* the bar's glass lives on ::before, not on the bar: a backdrop-filter on the bar would clip the lens's own glass to the bar's edge */
@@ -928,22 +928,22 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   nav.tabbar .pill.drag button.on:not(.hot) { color: #fff; }
   #toast { bottom: calc(max(10px, env(safe-area-inset-bottom) - 14px) + 62px + 12px); }
 }
-@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
+@media (max-width:599px) and (prefers-reduced-motion: reduce) {
   nav.tabbar .pill.lift { --lift: 0; } nav.tabbar .pill.lift::before, nav.tabbar .pill.lift::after { inset: 0; }
   nav.tabbar .pill.lift .lens, nav.tabbar .pill.drag .lens { scale: 1; }
 }
-@media (max-width: 700px) and (prefers-reduced-transparency: reduce) {
+@media (max-width:599px) and (prefers-reduced-transparency: reduce) {
   nav.tabbar .pill::before { background: #2c2c2e; -webkit-backdrop-filter: none; backdrop-filter: none; } nav.tabbar .lens { background: #111; }
   nav.tabbar .pill.lift .lens, nav.tabbar .pill.drag .lens { background: #3a3a3c; }
 }
-@media (max-width: 700px) and (prefers-contrast: more) {
+@media (max-width:599px) and (prefers-contrast: more) {
   nav.tabbar .pill::before { background: #1c1c1e; -webkit-backdrop-filter: none; backdrop-filter: none; } nav.tabbar .pill button { color: #fff; } nav.tabbar .pill button.on { color: #b8a8ff; }
 }
 
 @property --lift { syntax: '<number>'; inherits: true; initial-value: 0; }
 
 /* ---- smoothness (ProMotion 120Hz): keep every moving thing on the compositor and drop blur that can't be seen ---- */
-@media (max-width: 700px) {
+@media (max-width:599px) {
   /* sheets are 97% opaque, so their 40px backdrop blur was invisible but re-rendered every frame of every drag */
   .sheet { -webkit-backdrop-filter: none; backdrop-filter: none; will-change: transform; }
   .overlay { will-change: background-color; }
@@ -954,8 +954,8 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 
 /* ============ Desktop: dark, Apple Music / Podcasts style with Liquid Glass touches ============
    Floating glass sidebar, solid near-black content panel, flat hairline cards, glass only on floating
-   chrome (sidebar, menus, sheets, toast). One purple accent. Phone (<=700px) keeps its own theme. */
-@media (min-width: 701px) {
+   chrome (sidebar, menus, sheets, toast). One purple accent. Phone (<600px) keeps its own theme. */
+@media (min-width:600px) {
   :root {
     color-scheme: dark;
     --bg: #131316; --group: rgba(255,255,255,.055); --fill: rgba(255,255,255,.07); --fill2: rgba(255,255,255,.12); --sep: rgba(255,255,255,.09);
@@ -1071,10 +1071,10 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.22); }
   ::selection { background: rgba(123,92,255,.5); }
 }
-@media (min-width: 701px) and (prefers-reduced-transparency: reduce) {
+@media (min-width:600px) and (prefers-reduced-transparency: reduce) {
   .side, .menu, .sheet, .updbar, .bubble { -webkit-backdrop-filter: none; backdrop-filter: none; background: #25252b; }
 }
-@media (min-width: 701px) and (prefers-contrast: more) {
+@media (min-width:600px) and (prefers-contrast: more) {
   :root { --text2: rgba(255,255,255,.85); --hair: rgba(255,255,255,.4); }
   .card, .group { box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
 }
@@ -1098,7 +1098,7 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 .iconbtn .ic { width: 17px; height: 17px; vertical-align: 0; }
 .search { display: none; }
 .tabhead { display: none; }
-@media (min-width: 701px) {
+@media (min-width:600px) {
   /* tab header: dashboard only, a glass extension of the sidebar (same material, purple fade) */
   div.app { grid-template-rows: auto minmax(0, 1fr); }
   .side { grid-row: 1 / 3; }
@@ -1125,8 +1125,6 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   .search input, .search input:focus { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; outline: none; font-size: 14.5px; color: var(--text); -webkit-appearance: none; appearance: none; }
   .search input::placeholder { color: var(--text3); }
   .search input::-webkit-search-cancel-button { display: none; }
-  .search kbd { font: 600 11px/1 -apple-system, "Segoe UI", sans-serif; color: var(--text3); padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,.08); transition: opacity .2s; }
-  .search.open kbd { opacity: 0; }
   .sres { position: absolute; top: calc(100% + 14px); right: 0; width: 520px; max-width: 70vw; max-height: min(62vh, 540px); overflow-y: auto; padding: 8px; border-radius: 22px;
     background: rgba(34,34,42,.8); -webkit-backdrop-filter: blur(44px) saturate(190%); backdrop-filter: blur(44px) saturate(190%);
     box-shadow: inset 0 1px 0 rgba(255,255,255,.24), inset 0 0 0 1px rgba(255,255,255,.1), 0 30px 80px rgba(0,0,0,.65);
@@ -1186,8 +1184,8 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   .collapsed .who { flex: none; width: 48px; height: 44px; padding: 0; justify-content: center; }
   .collapsed .collapse { width: 44px; height: 38px; border-radius: 12px; }
 }
-@media (min-width: 701px) and (max-width: 1100px) { .search { width: 200px; } .search.open { width: 320px; } }
-@media (min-width: 701px) and (prefers-reduced-transparency: reduce) { .tabhead, .sres, .onb-card { -webkit-backdrop-filter: none; backdrop-filter: none; background: #25252b; } }
+@media (min-width:600px) and (max-width: 1100px) { .search { width: 200px; } .search.open { width: 320px; } }
+@media (min-width:600px) and (prefers-reduced-transparency: reduce) { .tabhead, .sres, .onb-card { -webkit-backdrop-filter: none; backdrop-filter: none; background: #25252b; } }
 
 /* search hit: briefly glow the thing you searched for */
 @keyframes hit { 0% { box-shadow: 0 0 0 0 rgba(179,165,255,0); } 18% { box-shadow: 0 0 0 3px rgba(179,165,255,.95), 0 0 34px 6px rgba(123,92,255,.65); background-color: rgba(123,92,255,.28); } 100% { box-shadow: 0 0 0 0 rgba(179,165,255,0); } }
@@ -1197,7 +1195,7 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
 /* ============ Phone: collapsing tab bar (search pill + folding tabs) and search page ============
    Motion copied from the iOS 26 Podcasts bar: tabs fade, the bar shrinks to a circle on the left, the search pill glides down
    between that circle and a More circle on the right. Glass elements grow by size/inset, never by scale (WebKit squares scaled blur). */
-@media (max-width: 700px) {
+@media (max-width:599px) {
   :root { --mo: cubic-bezier(.32, .72, 0, 1); }
   nav.tabbar { height: 62px; overflow: visible; }
   nav.tabbar .pill { position: absolute; left: 0; bottom: 0; width: 100%; transition: width .6s var(--mo), height .6s var(--mo), bottom .6s var(--mo), --lift .42s var(--spring); }
@@ -1269,13 +1267,13 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   .spage .sit.new { animation: sitin2 .45s cubic-bezier(.2,.9,.3,1) both; animation-delay: min(calc(var(--i) * 45ms), 270ms); }
   @keyframes sitin2 { from { opacity: 0; transform: translateY(16px) scale(.97); filter: blur(5px); } to { opacity: 1; transform: none; filter: none; } }
 }
-@media (max-width: 700px) and (prefers-reduced-transparency: reduce) {
+@media (max-width:599px) and (prefers-reduced-transparency: reduce) {
   nav.tabbar .sp, nav.tabbar .mr { background: #2c2c2e; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .spage, .spage.full { -webkit-backdrop-filter: none; backdrop-filter: none; background: #0a0a10; }
 }
 
 /* ============ Phone 1.0.29: press feedback on the bar, floating glass More menu ============ */
-@media (max-width: 700px) {
+@media (max-width:599px) {
   /* glass can't be scaled in WebKit, so a press shrinks it by size and brightens it */
   nav.tabbar .mr { transition: opacity .3s .2s, width .3s var(--mo), height .3s var(--mo), right .3s var(--mo), bottom .3s var(--mo), background-color .2s; }
   nav.tabbar.mini .mr:active { width: 48px; height: 48px; right: 3px; bottom: 7px; background: rgba(255,255,255,.24); transition: width .12s, height .12s, right .12s, bottom .12s, background-color .08s; }
@@ -1308,6 +1306,33 @@ input:focus, select:focus, textarea:focus { box-shadow: inset 0 0 0 1.5px var(--
   .sheet.more .mpets button:last-child { padding-left: 4px; }
   .sheet.more .mpets button:last-child .ic { color: #b8a8ff; }
 }
-@media (max-width: 700px) and (prefers-reduced-transparency: reduce) {
+@media (max-width:599px) and (prefers-reduced-transparency: reduce) {
   .sheet.more:not(.addsheet) { background: #25252b; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* ============ Galaxy Z Fold: inner screen (600-900px, near-square) and cover screen (<600px, tall and narrow) ============
+   Inner: the desktop look with the sidebar always a slim icon rail, tighter padding, two-column cards once there's room.
+   Cover: the phone layout, trimmed for a ~360px-wide, very tall screen. */
+@media (min-width: 600px) and (max-width: 900px) {
+  div.app, div.app.collapsed { grid-template-columns: 84px minmax(0, 1fr); padding: 8px; column-gap: 8px; }
+  #collapse { display: none; }
+  .side .lbl, .side .bname, .side .chev, .side .wname { display: none; }
+  main { padding: 24px 22px 36px; border-radius: 20px; }
+  .top { margin-bottom: 20px; }
+  h1 { font-size: 28px; }
+  .tabhead { padding: 12px 12px 12px 22px; }
+  .search { width: 220px; } .search.open { width: 300px; }
+  .sres { width: min(520px, 80vw); }
+  .type-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+  .card { padding: 16px 18px; }
+  .cards.three > .card, .card.today { padding: 18px 20px; }
+  .card.hero h2 { font-size: 30px; }
+  .card.hero .photo { width: 96px; height: 96px; }
+  .sheet { max-width: 560px; }
+}
+/* unfolded and wide enough for two columns (Fold 7/8 inner is ~830x750): keep the cards side by side */
+@media (min-width: 760px) and (max-width: 900px) { main { padding: 28px 28px 40px; } }
+@media (max-width: 599px) and (max-width: 400px) {
+  main { padding-left: 14px; padding-right: 14px; }
+  nav.tabbar { left: 14px; right: 14px; }
 }

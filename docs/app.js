@@ -337,6 +337,11 @@ async function boot() {
   let collapsed = false;
   try { collapsed = localStorage.getItem('sbCollapsed') === '1'; } catch { /* default expanded */ }
   setSidebar(collapsed);
+  // Fold inner screen / small tablets: always the slim rail; back to the saved choice when wider
+  const rail = matchMedia('(min-width:600px) and (max-width:900px)');
+  const fit = () => $('.app').classList.toggle('collapsed', rail.matches || collapsed);
+  rail.addEventListener('change', () => { collapsed = localStorage.getItem('sbCollapsed') === '1'; fit(); });
+  fit();
   render(); playEnter();
   if (!pets().length) openProfileModal(true);
   purgeDay = today(); purgeOldLogs().then(() => { if (ui.page === 'log' || ui.page === 'dashboard') render(); });
@@ -1148,7 +1153,7 @@ function spring({ from, to, v = 0, response = 0.35, damping = 1, onUpdate, onDon
 }
 const project = (v, d = 0.998) => (v / 1000) * d / (1 - d); // where a flick at v px/s would come to rest
 const rubber = (o, dim, c = 0.55) => (o * dim * c) / (dim + c * Math.abs(o)); // resistance past an edge
-const isPhone = () => matchMedia('(max-width:700px)').matches;
+const isPhone = () => matchMedia('(max-width:599px)').matches;
 const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const sheetFx = {
