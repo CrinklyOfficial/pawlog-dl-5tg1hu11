@@ -35,8 +35,10 @@ function ageText(dob) {
   if (now.getDate() < d.getDate()) m--;
   if (m < 0) return 'Not born yet';
   const anchor = new Date(d.getFullYear(), d.getMonth() + m, d.getDate());
-  const w = Math.floor((now - anchor) / 86400000 / 7);
-  return `${m} month${m === 1 ? '' : 's'}, ${w} week${w === 1 ? '' : 's'}`;
+  const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - anchor) / 86400000);
+  const parts = [[m, 'month'], [Math.floor(days / 7), 'week'], [days % 7, 'day']].filter(([n]) => n).map(([n, u]) => `${n} ${u}${n === 1 ? '' : 's'}`);
+  if (!parts.length) return '0 days';
+  return parts.length > 1 ? parts.slice(0, -1).join(', ') + (parts.length > 2 ? ',' : '') + ' and ' + parts[parts.length - 1] : parts[0];
 }
 
 function readImage(file, max, q = 0.85) {
@@ -257,6 +259,7 @@ const ui = {
   calSort: 'time',
   hiddenCats: new Set(),
   openAbout: new Set(),
+  noteSel: null,
 };
 
 async function save(kind, obj) {
@@ -268,10 +271,24 @@ async function save(kind, obj) {
   cloudWrite(kind, obj.id, 'u');
   return obj;
 }
-async function remove(kind, id) {
-  S[kind].delete(id);
-  await invoke('db_delete', { kind, id });
-  cloudWrite(kind, id, 'd');
+// A user-initiated delete holds a "Deleting…" screen for 1.3s so it feels final; quiet = automatic cleanup / undo.
+let delN = 0, delT = 0;
+async function withDeleting(fn) {
+  const o = $('#deleting');
+  if (!delN++) { delT = Date.now(); o.hidden = false; o.classList.add('on'); }
+  try { await fn(); }
+  finally {
+    await new Promise((r) => setTimeout(r, Math.max(0, 1300 - (Date.now() - delT))));
+    if (!--delN) { o.classList.remove('on'); setTimeout(() => { if (!delN) o.hidden = true; }, 260); }
+  }
+}
+async function remove(kind, id, quiet = false) {
+  const go = async () => {
+    S[kind].delete(id);
+    await invoke('db_delete', { kind, id });
+    cloudWrite(kind, id, 'd');
+  };
+  return quiet ? go() : withDeleting(go);
 }
 
 const profile = () => get('profile', ui.petId) || {};
@@ -323,7 +340,13 @@ async function ensureDefaults() {
 }
 
 // Runs after every cloud sync (start, focus, joining a shared Pawlog).
+// The daily log is just for today: anything from an earlier day is deleted.
+function purgeOldLogs() {
+  const t = today();
+  [...allRaw('log')].forEach((l) => { if (dayOf(l.ts) < t) remove('log', l.id, true); });
+}
 function afterSync() {
+  purgeOldLogs();
   if (!get('profile', ui.petId) && pets().length) ui.petId = pets()[0].id;
   if (typeof render === 'function' && $('#view').innerHTML) render();
 }
@@ -426,12 +449,17 @@ function notesView() {
   const days = [...new Set(list.map((n) => n.date))];
   const card = (n) => {
     const m = shared && n.by && cloud.members.find((x) => x.user_id === n.by);
-    return `<button type="button" class="note" data-act="edit-pnote" data-id="${n.id}">
+    const sel = ui.noteSel;
+    return `<button type="button" class="note${sel && sel.has(n.id) ? ' picked' : ''}${sel ? ' selecting' : ''}" data-act="edit-pnote" data-id="${n.id}">${sel ? `<span class="npick" aria-hidden="true">${sel.has(n.id) ? ic('check') : ''}</span>` : ''}
       <div class="row between"><b class="nt">${esc(n.title || 'Note')}</b>${n.time ? `<span class="pill">${ic('clock')} ${fmtTime(n.time)}</span>` : ''}</div>
       ${n.text ? `<p>${esc(n.text)}</p>` : ''}${m ? `<span class="by">${esc(m.username || 'Member')}</span>` : ''}</button>`;
   };
-  return `<div class="row end"><span class="muted">${list.length} note${list.length === 1 ? '' : 's'}</span><button class="btn primary sm" data-act="new-pnote">+ New note</button></div>
-  ${days.length ? days.map((d) => `<h3 class="daylbl">${dayLabel(d)}</h3><div class="notes">${list.filter((n) => n.date === d).map(card).join('')}</div>`).join('')
+  const sel = ui.noteSel;
+  const bar = sel
+    ? `<span class="muted">${sel.size} selected</span><span class="row"><button class="btn ghost sm" data-act="note-all">${sel.size === list.length ? 'Select none' : 'Select all'}</button><button class="btn danger sm" data-act="note-del"${sel.size ? '' : ' disabled'}>${ui.noteConfirm ? 'Tap again to delete' : 'Delete' + (sel.size ? ' (' + sel.size + ')' : '')}</button><button class="btn sm" data-act="note-select">Done</button></span>`
+    : `<span class="muted">${list.length} note${list.length === 1 ? '' : 's'}</span><span class="row">${list.length ? '<button class="btn sm" data-act="note-select">Select</button>' : ''}<button class="btn primary sm" data-act="new-pnote">+ New note</button></span>`;
+  return `<div class="row between">${bar}</div>
+  ${days.length ? days.map((d) => `<h3 class="daylbl${d === t ? ' nowd' : ''}">${dayLabel(d)}</h3><div class="notes${d === t ? ' nowd' : ''}">${list.filter((n) => n.date === d).map(card).join('')}</div>`).join('')
     : `<div class="card">${blank('clipboard', 'No notes yet', `Jot down anything about ${esc(profile().name || 'your dog')}: a reminder, how the day went, or something to tell the vet.`)}</div>`}`;
 }
 
@@ -511,7 +539,7 @@ function phoneHero(p, d) {
   return `<div class="phhero">${photo}<div class="hshade"></div>
     <div class="hcol">
     <div class="hslides" id="hslides">
-      <div class="hs"><span class="heye">${greeting()}</span><h2>${nm}</h2><p>${bits || 'Add a breed and birthday in the profile'}</p><div class="hchips">${chips}</div></div>
+      <div class="hs"><h2>${nm}</h2><p>${bits || 'Add a breed and birthday in the profile'}</p><div class="hchips">${chips}</div></div>
       <div class="hs"><span class="heye">Today with ${nm}</span><h2>${d.n} logged</h2><p>${d.dueDone} of ${d.dueTotal} care tasks done${meal ? ' · Last meal ' + ago(meal.ts) : ''}</p><div class="hchips">${pee ? `<span class="hchip">Last pee ${ago(pee.ts)}</span>` : ''}<span class="hchip">${statusLine() ? esc(statusLine()) : 'All calm'}</span></div></div>
       <div class="hs"><span class="heye">Coming up</span><h2>${nextEv ? esc(nextEv.title) : 'Nothing scheduled'}</h2><p>${nextEv ? fmtDate(nextEv.date) + (nextEv.time ? ' · ' + fmtTime(nextEv.time) : '') : 'Add a vet visit or walk on the Calendar'}</p><div class="hchips"><span class="hchip">${d.shots} shot${d.shots === 1 ? '' : 's'} due soon</span></div></div>
     </div>
@@ -718,22 +746,17 @@ function calView() {
 }
 
 function logView() {
-  const day = ui.logDay, t = today();
+  purgeOldLogs();
+  const day = today();
   const entries = all('log').filter((l) => dayOf(l.ts) === day).sort((a, b) => a.ts.localeCompare(b.ts));
   return `
-  <div class="card">
-    <div class="row between">
-      <div class="row"><button class="btn ghost sm" data-act="log-day" data-v="-1" aria-label="Previous day">${ic('chev-left')}</button><h2 class="daylabel">${day === t ? 'Today' : fmtDate(day)}</h2><button class="btn ghost sm" data-act="log-day" data-v="1" aria-label="Next day">${ic('chev-right')}</button></div>
-      ${day !== t ? '<button class="btn ghost sm" data-act="log-today">Back to today</button>' : ''}
-    </div>
-  </div>
   <div class="card">
     <div class="row between"><h2>Log something</h2><button class="btn primary sm" data-act="new-tracker">+ New tracker</button></div>
     <div class="type-grid" style="margin-top:12px">${allTypes().map(typeBtn).join('')}</div>
   </div>
   <div class="card">
-    <h2>Entries</h2>
-    ${entries.length ? entries.map((l) => entryRow(l, true)).join('') : blank('bone', 'Nothing logged for this day')}
+    <div class="row between"><h2>Today</h2><span class="muted small">Cleared automatically each night</span></div>
+    ${entries.length ? entries.map((l) => entryRow(l, true)).join('') : blank('bone', 'Nothing logged yet today')}
   </div>`;
 }
 
@@ -1080,6 +1103,7 @@ $('#tabbar').addEventListener('click', (e) => { if (tb.lock && e.timeStamp - tb.
 
 bindHomeReorder();
 function render() {
+  if (ui.page !== 'notes') ui.noteSel = null;
   $('#nav').innerHTML = PAGES.filter(([id]) => id !== 'settings').map(([id, icon, label]) => `${NAV_SECTIONS[id] ? `<div class="navlbl">${NAV_SECTIONS[id]}</div>` : ''}<button data-nav="${id}" title="${label}" class="${id === ui.page ? 'on' : ''}" >${ic(icon)}<span class="lbl">${label}</span></button>`).join('');
   renderDock();
   const pr = profile();
@@ -1088,13 +1112,11 @@ function render() {
   document.body.dataset.page = ui.page;
   if (tb.page !== ui.page) { tb.page = ui.page; tabMini(false); tb.y = 0; }
   const [, , label] = PAGES.find((x) => x[0] === ui.page);
-  $('#title').textContent = ui.page === 'dashboard' ? 'Today' : label;
-  const chip = $('#petchip');
-  chip.innerHTML = pr.name ? `${avatar(pr, 'photo sm')}<div><b>${esc(pr.name)}</b><div class="muted small">${[esc(pr.breed || ''), pr.dob ? ageText(pr.dob) : ''].filter(Boolean).join(' · ')}</div><div class="status">${esc(statusLine())}</div></div>` : '';
-  chip.hidden = !pr.name;
+  const pageIcon = PAGES.find((x) => x[0] === ui.page)[1], head = ui.page === 'dashboard' ? 'Today' : label;
+  $('#title').innerHTML = `<span class="hico">${ic(pageIcon)}</span>${esc(head)}`;
+  $('#petchip').hidden = true;
   { const u = me(), nm = u.username || 'Account'; $('#acct').innerHTML = `${u.avatar ? `<img class="ava" src="${esc(u.avatar)}" alt="">` : `<span class="ava ph ini" aria-hidden="true">${esc(nm.trim().charAt(0).toUpperCase() || '?')}</span>`}<span class="an">${esc(nm)}</span>`; }
-  $('#greet').textContent = `${greeting()}, ${new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}`;
-  $('#htitle').textContent = 'Today'; $('#hgreet').textContent = $('#greet').textContent;
+  $('#htitle').innerHTML = `<span class="hico">${ic(PAGES.find((x) => x[0] === 'dashboard')[1])}</span>Today`;
   const m = me();
   $('#who').innerHTML = `${m.avatar ? `<img class="ava" src="${esc(m.avatar)}" alt="">` : `<span class="ava ph">${dogArt('awake')}</span>`}<span class="lbl wname"><b>${esc(m.username || 'Account')}</b><small id="syncst"></small></span>`;
   const gear = $('#gear'); gear.innerHTML = ic('settings'); gear.classList.toggle('on', ui.page === 'settings');
@@ -1251,19 +1273,18 @@ function openModal(title, body, onSubmit, saveLabel = 'Save', extra = '') {
 function openLogModal(typeId) {
   const info = typeInfo(typeId);
   openModal(`${ic(info.icon)} ${esc(info.name)}`,
-    field('Date', `<input type="date" name="day" required value="${ui.logDay}">`) +
     field('Time', `<input type="time" name="time" required value="${nowTime()}">`) +
     (info.detail === 'level' ? field(`How much did ${esc(profile().name)} drink?`, `<select name="level"><option>a little</option><option selected>medium</option><option>a lot</option></select>`) : '') +
     field(info.detail === 'note' ? 'What was it? (optional)' : 'Notes (optional)', `<input name="note">`),
-    async (f) => save('log', { type: typeId, ts: stamp(f.get('day'), f.get('time')), level: f.get('level') || '', note: f.get('note').trim() }),
+    async (f) => save('log', { type: typeId, ts: stamp(today(), f.get('time')), level: f.get('level') || '', note: f.get('note').trim() }),
     'Log it');
 }
 
 async function quick(id) {
   const info = typeInfo(id);
-  if (info.detail || ui.logDay !== today()) return openLogModal(id);
+  if (info.detail) return openLogModal(id);
   const rec = await save('log', { type: id, ts: new Date().toISOString(), level: '', note: '' });
-  toast('Logged ' + (info.name || id), () => remove('log', rec.id));
+  toast('Logged ' + (info.name || id), () => remove('log', rec.id, true));
 }
 
 function openTrackerModal() {
@@ -1520,8 +1541,6 @@ const actions = {
   ...cloudActions,
   close: closeModal,
   collapse: () => setSidebar(!$('.app').classList.contains('collapsed')),
-  'log-day': (el) => { ui.logDay = addDays(ui.logDay, +el.dataset.v); },
-  'log-today': () => { ui.logDay = today(); },
   quick: (el, id) => quick(id),
   'del-log': (el, id) => remove('log', id),
   'new-tracker': openTrackerModal,
@@ -1566,7 +1585,22 @@ const actions = {
   'new-note': openNoteModal,
   'del-note': async (el, id) => { await remove('vetNote', id); closeModal(); },
   'new-pnote': () => openNoteEdit(),
-  'edit-pnote': (el, id) => openNoteEdit(id),
+  'edit-pnote': (el, id) => {
+    if (!ui.noteSel) return openNoteEdit(id);
+    ui.noteConfirm = false;
+    ui.noteSel.has(id) ? ui.noteSel.delete(id) : ui.noteSel.add(id);
+  },
+  'note-select': () => { ui.noteConfirm = false; ui.noteSel = ui.noteSel ? null : new Set(); },
+  'note-all': () => {
+    ui.noteConfirm = false;
+    const ids = all('vetNote').filter((n) => n.kind === 'note').map((n) => n.id);
+    ui.noteSel = ui.noteSel.size === ids.length ? new Set() : new Set(ids);
+  },
+  'note-del': async (el) => {
+    if (!ui.noteConfirm) { ui.noteConfirm = true; return; }
+    const ids = [...ui.noteSel]; ui.noteSel = null; ui.noteConfirm = false;
+    await Promise.all(ids.map((id) => remove('vetNote', id)));
+  },
   'new-exam': () => openExamModal(),
   'edit-exam': (el, id) => openExamModal(id),
   'new-report': openReportModal,
@@ -1764,7 +1798,6 @@ function searchGo(k) {
 }
 function goHit(it) {
   ui.page = it.page;
-  if (it.day) ui.logDay = it.day;
   if (it.date) { const d = parseYmd(it.date); ui.calMonth = new Date(d.getFullYear(), d.getMonth(), 1); ui.selDay = it.date; }
   closeModal(); render(); playEnter();
   setTimeout(() => searchFlash(it), 220);

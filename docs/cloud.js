@@ -103,6 +103,7 @@ async function pullDocs(legacy) {
       else { S[kind].delete(id); await invoke('db_delete', { kind, id }); }     // someone deleted it elsewhere
     }
   }
+  c.from('docs').delete().eq('household_id', hh).eq('deleted', true).then(() => {}, () => {});   // clear old tombstones from earlier versions
   if (legacy) await flushDirty();
 }
 
@@ -119,8 +120,10 @@ async function flushDirty() {
       for (const [key, op] of Object.entries(dirty())) {
         const i = key.indexOf('/'), kind = key.slice(0, i), id = key.slice(i + 1);
         const doc = S[kind] && S[kind].get(id);
-        const row = { household_id: cloud.household, kind, id, data: op === 'u' && doc ? doc : {}, deleted: !(op === 'u' && doc) };
-        const { error } = await cloud.client.from('docs').upsert(row, { onConflict: 'household_id,kind,id' });
+        // Deleting removes the row for good (no tombstone left behind, so it takes no storage)
+        const { error } = op === 'u' && doc
+          ? await cloud.client.from('docs').upsert({ household_id: cloud.household, kind, id, data: doc, deleted: false }, { onConflict: 'household_id,kind,id' })
+          : await cloud.client.from('docs').delete().match({ household_id: cloud.household, kind, id });
         if (error) throw error;
         delete dirty()[key]; saveDirty();
       }
@@ -147,6 +150,11 @@ function subscribe() {
 }
 let renderT = 0;
 async function onRemote(p) {
+  if (p.eventType === 'DELETE' && p.old && p.old.kind && S[p.old.kind] && !dirty()[dkey(p.old.kind, p.old.id)]) {
+    S[p.old.kind].delete(p.old.id); await invoke('db_delete', { kind: p.old.kind, id: p.old.id });
+    clearTimeout(renderT); renderT = setTimeout(() => { if ($('#modal').hidden) render(); }, 200);
+    return;
+  }
   const r = p.new;
   if (!r || r.household_id !== cloud.household || !S[r.kind] || dirty()[dkey(r.kind, r.id)]) return;
   if (r.deleted) { S[r.kind].delete(r.id); await invoke('db_delete', { kind: r.kind, id: r.id }); }
